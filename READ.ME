@@ -1,0 +1,211 @@
+# Recipe Finder App
+
+A full-stack recipe management application built with FastAPI (backend) and vanilla JavaScript (frontend). Users can register, login, create, edit, delete, and favorite recipes.
+
+## Features
+
+### Authentication
+- User registration and login
+- JWT token-based authentication
+- Protected routes for authenticated users
+
+### Recipe Management (CRUD)
+- **Create**: Add new recipes with ingredients, instructions, prep/cook time
+- **Read**: Browse all recipes, search recipes, view detailed recipe information
+- **Update**: Edit your own recipes (coming soon)
+- **Delete**: Remove your own recipes
+
+### Additional Features
+- **Favorites**: Save recipes to your favorites list
+- **Search**: Search recipes by title, description, or ingredients
+- **Responsive Design**: Works on desktop and mobile devices
+- **External API Integration**: Search recipes from Spoonacular API (optional)
+
+## Tech Stack
+
+### Backend
+- **FastAPI**: Modern, fast web framework for building APIs
+- **SQLAlchemy**: SQL toolkit and ORM
+- **SQLite**: Database (easily changeable to PostgreSQL)
+- **JWT**: JSON Web Tokens for authentication
+- **Bcrypt**: Password hashing
+- **Pydantic**: Data validation using Python type annotations
+
+### Frontend
+- **HTML5**: Semantic markup
+- **CSS3**: Modern styling with animations and responsive design
+- **Vanilla JavaScript**: No frameworks, pure JavaScript
+- **Font Awesome**: Icons
+
+## Installation and Setup
+
+### 1. Clone the Repository
+```bash
+git clone <your-repo-url>
+cd recipe-finder-app
+```
+
+### 2. Set Up Python Virtual Environment
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On Mac/Linux:
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Set Up Environment Variables
+Create a `.env` file in the root directory:
+
+```env
+SECRET_KEY=your-super-secret-jwt-key-here-make-it-long-and-random-32-chars
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+DATABASE_URL=sqlite:///./recipes.db
+SPOONACULAR_API_KEY=your-spoonacular-api-key-here
+```
+
+**Generate a secure secret key:**
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### 5. Initialize the Database
+The database tables will be created automatically when you first run the application.
+
+### 6. Run the Application
+```bash
+# Development server
+uvicorn backend.main:app --reload
+
+# Or if main.py is in the root directory:
+uvicorn main:app --reload
+```
+
+The application will be available at: `http://localhost:8000`
+
+## API Documentation
+
+Once the server is running, you can access the interactive API documentation at:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## Project Structure
+
+```
+recipe-finder-app/
+├── backend/
+│   ├── __init__.py
+│   ├── main.py          # FastAPI application entry point
+│   ├── database.py      # Database configuration
+│   ├── models.py        # SQLAlchemy models
+│   ├── schemas.py       # Pydantic schemas
+│   ├── crud.py          # Database operations
+│   └── auth.py          # Authentication logic
+├── frontend/
+│   ├── index.html       # Main HTML file
+│   ├── styles.css       # CSS styling
+│   └── app.js           # JavaScript logic
+├── tests/
+│   └── test_users.py    # Test files
+├── requirements.txt     # Python dependencies
+├── .env                 # Environment variables (create this)
+├── .gitignore          # Git ignore file
+└── README.md           # This file
+```
+
+## Usage
+
+### 1. Register a New User
+- Click "Login" in the navigation
+- Switch to "Register" tab
+- Fill in username, email, and password
+- Click "Register"
+
+### 2. Login
+- Click "Login" in the navigation
+- Enter your username and password
+- Click "Login"
+
+### 3. Add a Recipe
+- After logging in, go to "My Recipes"
+- Click "Add Recipe" button
+- Fill in the recipe details
+- Click "Save Recipe"
+
+### 4. Browse and Search Recipes
+- Go to "Recipes" to see all recipes
+- Use the search bar to find specific recipes
+- Click on any recipe card to view details
+
+### 5. Manage Favorites
+- Click the heart icon on any recipe to add/remove from favorites
+- Go to "Favorites" to see your saved recipes
+
+## API Endpoints
+
+### Authentication
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - Login user
+- `GET /auth/me` - Get current user info
+
+### Recipes
+- `GET /recipes` - Get all recipes
+- `GET /recipes/{id}` - Get specific recipe
+- `GET /recipes/search` - Search recipes
+- `GET /recipes/my` - Get user's recipes
+- `POST /recipes` - Create new recipe
+- `PUT /recipes/{id}` - Update recipe
+- `DELETE /recipes/{id}` - Delete recipe
+
+### Favorites
+- `GET /favorites` - Get user's favorites
+- `POST /favorites/{recipe_id}` - Add to favorites
+- `DELETE /favorites/{recipe_id}` - Remove from favorites
+
+## Testing
+
+Run the tests:
+```bash
+pytest tests/
+```
+
+## External API Integration
+
+The app supports integration with the Spoonacular API for additional recipe data:
+
+1. Sign up for a free API key at [Spoonacular](https://spoonacular.com/food-api)
+2. Add your API key to the `.env` file:
+   ```
+   SPOONACULAR_API_KEY=your-api-key-here
+   ```
+3. Use the `/api/recipes/external` endpoint to search external recipes
+
+## Deployment
+
+### Using Docker (recommended)
+```dockerfile
+# Create a Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Using Cloud Platforms
+- **Heroku**: Use the provided configuration
+- **Railway**: Connect your GitHub repository
+- **Digital Oc

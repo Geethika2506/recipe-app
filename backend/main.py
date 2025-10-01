@@ -75,10 +75,23 @@ async def read_current_user(current_user: models.User = Depends(auth.get_current
     return current_user
 
 # ----------------- Recipe Routes -----------------
-@app.get("/recipes", response_model=List[schemas.Recipe])
-async def read_recipes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Get all recipes"""
-    return crud.get_recipes(db, skip=skip, limit=limit)
+@app.get("/recipes")
+async def read_all_recipes(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    """Get all recipes (local + external API)"""
+    # Local DB recipes
+    local_recipes = crud.get_recipes(db, skip=skip, limit=limit)
+
+    # External API recipes (random 5 for variety)
+    async with httpx.AsyncClient() as client:
+        res = await client.get("https://www.themealdb.com/api/json/v1/1/search.php", params={"s": ""})
+        data = res.json()
+        external_recipes = data.get("meals", [])[:5] if data else []
+
+    return {
+        "local_recipes": local_recipes,
+        "external_recipes": external_recipes
+    }
+
 
 @app.get("/recipes/search", response_model=List[schemas.Recipe])
 async def search_recipes(q: str, skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
@@ -102,6 +115,30 @@ async def read_recipe(recipe_id: int, db: Session = Depends(get_db)):
     if recipe is None:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return recipe
+
+@app.get("/recipes/search/ingredient")
+async def search_recipes_by_ingredient(ingredient: str):
+    """Search recipes from TheMealDB by ingredient"""
+    async with httpx.AsyncClient() as client:
+        res = await client.get(
+            "https://www.themealdb.com/api/json/v1/1/filter.php",
+            params={"i": ingredient}
+        )
+        data = res.json()
+        if not data or not data.get("meals"):
+            return {"meals": []}
+
+        # Get details of first 5 results
+        recipes = []
+        for meal in data["meals"][:5]:
+            lookup = await client.get(
+                "https://www.themealdb.com/api/json/v1/1/lookup.php",
+                params={"i": meal["idMeal"]}
+            )
+            recipes.append(lookup.json()["meals"][0])
+
+        return {"meals": recipes}
+
 
 @app.post("/recipes", response_model=schemas.Recipe)
 async def create_recipe(
@@ -176,30 +213,31 @@ async def remove_from_favorites(
     return {"message": "Recipe removed from favorites"}
 
 # ----------------- External API Integration -----------------
-@app.get("/api/recipes/external")
-async def search_external_recipes(q: str, number: int = 10):
-    """Search recipes from external API (Spoonacular)"""
-    api_key = os.getenv("SPOONACULAR_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=503, detail="External API not configured")
-    
+@app.get("/api/recipes/mealdb")
+async def search_mealdb_recipes(i: str):
+    """Search recipes from TheMealDB by ingredient"""
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(
-                "https://api.spoonacular.com/recipes/complexSearch",
-                params={
-                    "query": q,
-                    "number": number,
-                    "apiKey": api_key,
-                    "addRecipeInformation": True
-                }
+        # Step 1: Filter by ingredient
+        filter_res = await client.get(
+            "https://www.themealdb.com/api/json/v1/1/filter.php",
+            params={"i": i}
+        )
+        filter_data = filter_res.json()
+        if not filter_data or not filter_data.get("meals"):
+            return {"meals": []}
+
+        # Step 2: Lookup full recipes for first few results
+        recipes = []
+        for meal in filter_data["meals"][:5]:  # limit results
+            meal_id = meal["idMeal"]
+            lookup_res = await client.get(
+                "https://www.themealdb.com/api/json/v1/1/lookup.php",
+                params={"i": meal_id}
             )
-            if response.status_code == 200:
-                return response.json()
-            else:
-                raise HTTPException(status_code=response.status_code, detail="External API error")
-        except httpx.RequestError:
-            raise HTTPException(status_code=503, detail="External API unavailable")
+            recipes.append(lookup_res.json())
+
+        return {"meals": recipes}
+
 
 # ----------------- Root Route -----------------
 @app.get("/")

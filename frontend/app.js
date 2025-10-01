@@ -639,7 +639,82 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
-// Edit recipe function (placeholder)
-function editRecipe(recipeId) {
-    showToast('Edit functionality coming soon!', 'info');
+async function editRecipe(recipeId) {
+    if (!authToken) {
+        showToast('Please login to edit recipes', 'warning');
+        return;
+    }
+
+    try {
+        // Get the recipe details first
+        const response = await fetch(`/recipes/${recipeId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        const recipe = await response.json();
+
+        if (!response.ok) {
+            showToast(recipe.detail || 'Error loading recipe', 'error');
+            return;
+        }
+
+        // Prefill form with existing recipe data
+        document.getElementById('recipe-title').value = recipe.title;
+        document.getElementById('recipe-description').value = recipe.description || '';
+        document.getElementById('recipe-ingredients').value = recipe.ingredients || '';
+        document.getElementById('recipe-instructions').value = recipe.instructions || '';
+        document.getElementById('recipe-prep-time').value = recipe.prep_time || '';
+        document.getElementById('recipe-cook-time').value = recipe.cook_time || '';
+        document.getElementById('recipe-servings').value = recipe.servings || 1;
+        document.getElementById('recipe-difficulty').value = recipe.difficulty || 'easy';
+        document.getElementById('recipe-image-url').value = recipe.image_url || '';
+
+        // Open the modal
+        openModal('add-recipe-modal');
+
+        // Replace form submit handler temporarily
+        const form = document.getElementById('add-recipe-form');
+        form.onsubmit = async function(e) {
+            e.preventDefault();
+
+            const updatedData = {
+                title: document.getElementById('recipe-title').value,
+                description: document.getElementById('recipe-description').value,
+                ingredients: document.getElementById('recipe-ingredients').value,
+                instructions: document.getElementById('recipe-instructions').value,
+                prep_time: parseInt(document.getElementById('recipe-prep-time').value) || null,
+                cook_time: parseInt(document.getElementById('recipe-cook-time').value) || null,
+                servings: parseInt(document.getElementById('recipe-servings').value) || 1,
+                difficulty: document.getElementById('recipe-difficulty').value,
+                image_url: document.getElementById('recipe-image-url').value || null
+            };
+
+            try {
+                const updateResponse = await fetch(`/recipes/${recipeId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(updatedData)
+                });
+
+                if (updateResponse.ok) {
+                    showToast('Recipe updated successfully!', 'success');
+                    closeModal('add-recipe-modal');
+                    loadMyRecipes(); // refresh list
+                } else {
+                    const data = await updateResponse.json();
+                    showToast(data.detail || 'Error updating recipe', 'error');
+                }
+            } catch (error) {
+                showToast('Network error updating recipe', 'error');
+                console.error('Edit recipe error:', error);
+            }
+        };
+    } catch (error) {
+        showToast('Error loading recipe for edit', 'error');
+        console.error('Edit recipe fetch error:', error);
+    }
 }

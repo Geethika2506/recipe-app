@@ -674,6 +674,11 @@ async function performSearch() {
         showLoading(false);
     }
 }
+
+window.quickSearch = function(term) {
+    searchInput.value = term;
+    performSearch();
+};
 // UI Helper functions
 function showSection(sectionId) {
     document.querySelectorAll('.section').forEach(section => {

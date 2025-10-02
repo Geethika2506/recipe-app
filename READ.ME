@@ -1,6 +1,6 @@
 # Recipe Finder App
 
-A full-stack recipe management application built with FastAPI (backend) and vanilla JavaScript (frontend). Users can register, login, create, edit, delete, and favorite recipes.
+A full-stack recipe management application built with FastAPI (backend) and vanilla JavaScript (frontend). Users can register, login, create, edit, delete, and favorite recipes. Search across all public recipes or find recipes from external sources like TheMealDB.
 
 ## Features
 
@@ -8,18 +8,25 @@ A full-stack recipe management application built with FastAPI (backend) and vani
 - User registration and login
 - JWT token-based authentication
 - Protected routes for authenticated users
+- Secure password hashing with bcrypt
 
 ### Recipe Management (CRUD)
-- **Create**: Add new recipes with ingredients, instructions, prep/cook time
-- **Read**: Browse all recipes, search recipes, view detailed recipe information
-- **Update**: Edit your own recipes (coming soon)
+- **Create**: Add new recipes with ingredients, instructions, prep/cook time, difficulty level
+- **Read**: Browse all public recipes with pagination, view detailed recipe information
+- **Update**: Edit your own recipes
 - **Delete**: Remove your own recipes
+- **Public/Private**: Control recipe visibility
+
+### Search & Discovery
+- **Ingredient Search**: Search all public recipes by ingredient (e.g., "chicken", "tomato")
+- **External API Integration**: Optionally search recipes from TheMealDB
+- **Pagination**: Load more recipes as you scroll
 
 ### Additional Features
 - **Favorites**: Save recipes to your favorites list
-- **Search**: Search recipes by title, description, or ingredients
+- **My Recipes**: Manage all your created recipes
 - **Responsive Design**: Works on desktop and mobile devices
-- **External API Integration**: Search recipes from Spoonacular API (optional)
+- **Real-time Updates**: Changes reflect immediately
 
 ## Tech Stack
 
@@ -27,9 +34,10 @@ A full-stack recipe management application built with FastAPI (backend) and vani
 - **FastAPI**: Modern, fast web framework for building APIs
 - **SQLAlchemy**: SQL toolkit and ORM
 - **SQLite**: Database (easily changeable to PostgreSQL)
-- **JWT**: JSON Web Tokens for authentication
+- **JWT (python-jose)**: JSON Web Tokens for authentication
 - **Bcrypt**: Password hashing
 - **Pydantic**: Data validation using Python type annotations
+- **httpx**: Async HTTP client for external API calls
 
 ### Frontend
 - **HTML5**: Semantic markup
@@ -42,7 +50,7 @@ A full-stack recipe management application built with FastAPI (backend) and vani
 ### 1. Clone the Repository
 ```bash
 git clone <your-repo-url>
-cd recipe-finder-app
+cd recipe-app-1
 ```
 
 ### 2. Set Up Python Virtual Environment
@@ -51,7 +59,9 @@ cd recipe-finder-app
 python -m venv venv
 
 # Activate virtual environment
-# On Windows:
+# On Windows (Git Bash):
+source venv/Scripts/activate
+# On Windows (CMD):
 venv\Scripts\activate
 # On Mac/Linux:
 source venv/bin/activate
@@ -59,14 +69,23 @@ source venv/bin/activate
 
 ### 3. Install Dependencies
 ```bash
+pip install fastapi uvicorn sqlalchemy python-multipart python-jose[cryptography] passlib[bcrypt]==1.7.4 bcrypt==4.0.1 httpx python-dotenv
+
+pip install fastapi uvicorn[standard] sqlalchemy passlib[bcrypt] python-jose[cryptography] python-multipart python-dotenv httpx pydantic[email]
+```
+
+**Important**: We use `bcrypt==4.0.1` for compatibility with `passlib`. Version 5.x causes issues.
+
+Or install from requirements.txt:
+```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set Up Environment Variables
+### 4. Set Up Environment Variables (Optional)
 Create a `.env` file in the root directory:
 
 ```env
-SECRET_KEY=your-super-secret-jwt-key-here-make-it-long-and-random-32-chars
+SECRET_KEY=your-super-secret-jwt-key-here-make-it-long-and-random
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 DATABASE_URL=sqlite:///./recipes.db
 SPOONACULAR_API_KEY=your-spoonacular-api-key-here
@@ -82,49 +101,54 @@ The database tables will be created automatically when you first run the applica
 
 ### 6. Run the Application
 ```bash
-# Development server
+# Run from project root
 uvicorn backend.main:app --reload
 
-# Or if main.py is in the root directory:
-uvicorn main:app --reload
+# Or with custom host and port
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The application will be available at: `http://localhost:8000`
+The application will be available at: `http://127.0.0.1:8000`
 
 ## API Documentation
 
 Once the server is running, you can access the interactive API documentation at:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
 
 ## Project Structure
 
 ```
-recipe-finder-app/
+recipe-app-1/
 ├── backend/
+│   ├── routers/
+│   │   ├── recipes.py      # Recipe routes
+│   │   └── users.py        # User routes
+│   ├── tests/
+│   │   ├── test_recipes.py
+│   │   └── test_users.py
 │   ├── __init__.py
-│   ├── main.py          # FastAPI application entry point
-│   ├── database.py      # Database configuration
-│   ├── models.py        # SQLAlchemy models
-│   ├── schemas.py       # Pydantic schemas
-│   ├── crud.py          # Database operations
-│   └── auth.py          # Authentication logic
+│   ├── main.py             # FastAPI application entry point
+│   ├── database.py         # Database configuration
+│   ├── models.py           # SQLAlchemy models
+│   ├── schemas.py          # Pydantic schemas
+│   ├── crud.py             # Database operations
+│   └── auth.py             # Authentication logic
 ├── frontend/
-│   ├── index.html       # Main HTML file
-│   ├── styles.css       # CSS styling
-│   └── app.js           # JavaScript logic
-├── tests/
-│   └── test_users.py    # Test files
-├── requirements.txt     # Python dependencies
-├── .env                 # Environment variables (create this)
-├── .gitignore          # Git ignore file
-└── README.md           # This file
+│   ├── index.html          # Main HTML file
+│   ├── styles.css          # CSS styling
+│   └── app.js              # JavaScript logic
+├── venv/                   # Virtual environment
+├── requirements.txt        # Python dependencies
+├── .env                    # Environment variables (create this)
+├── .gitignore             # Git ignore file
+└── README.md              # This file
 ```
 
 ## Usage
 
 ### 1. Register a New User
-- Click "Login" in the navigation
+- Click "Login" in the navigation bar
 - Switch to "Register" tab
 - Fill in username, email, and password
 - Click "Register"
@@ -134,78 +158,211 @@ recipe-finder-app/
 - Enter your username and password
 - Click "Login"
 
-### 3. Add a Recipe
+### 3. Browse All Recipes
+- Go to "Recipes" tab to see all public recipes
+- Click "Load More" to load additional recipes
+- Click on any recipe card to view full details
+
+### 4. Search by Ingredient
+- Use the search bar on the homepage
+- Enter an ingredient (e.g., "chicken", "pasta", "tomato")
+- Optionally check "Include external sources" for TheMealDB results
+- Click "Search" or press Enter
+
+### 5. Add a Recipe
 - After logging in, go to "My Recipes"
 - Click "Add Recipe" button
-- Fill in the recipe details
+- Fill in the recipe details:
+  - Title
+  - Description
+  - Ingredients (one per line)
+  - Instructions
+  - Prep time, cook time, servings
+  - Difficulty level
+  - Image URL
 - Click "Save Recipe"
 
-### 4. Browse and Search Recipes
-- Go to "Recipes" to see all recipes
-- Use the search bar to find specific recipes
-- Click on any recipe card to view details
+### 6. Manage Your Recipes
+- Go to "My Recipes" to see all recipes you've created
+- Click "Edit" to update a recipe
+- Click "Delete" to remove a recipe
 
-### 5. Manage Favorites
+### 7. Manage Favorites
 - Click the heart icon on any recipe to add/remove from favorites
-- Go to "Favorites" to see your saved recipes
+- Go to "Favorites" tab to see your saved recipes
 
 ## API Endpoints
 
 ### Authentication
 - `POST /auth/register` - Register new user
-- `POST /auth/login` - Login user
-- `GET /auth/me` - Get current user info
+- `POST /auth/login` - Login user and get JWT token
+- `GET /auth/me` - Get current authenticated user info
 
-### Recipes
-- `GET /recipes` - Get all recipes
-- `GET /recipes/{id}` - Get specific recipe
-- `GET /recipes/search` - Search recipes
-- `GET /recipes/my` - Get user's recipes
+### Recipes (Public - No Auth Required)
+- `GET /api/recipes?skip=0&limit=10` - Get all public recipes with pagination
+- `GET /api/recipes/search?ingredient=chicken&include_external=true` - Search recipes by ingredient
+- `GET /recipes/{id}` - Get specific recipe details
+
+### Recipes (Authenticated)
+- `GET /recipes/my` - Get current user's recipes
 - `POST /recipes` - Create new recipe
-- `PUT /recipes/{id}` - Update recipe
-- `DELETE /recipes/{id}` - Delete recipe
+- `PUT /recipes/{id}` - Update recipe (own recipes only)
+- `DELETE /recipes/{id}` - Delete recipe (own recipes only)
 
-### Favorites
-- `GET /favorites` - Get user's favorites
-- `POST /favorites/{recipe_id}` - Add to favorites
-- `DELETE /favorites/{recipe_id}` - Remove from favorites
+### Favorites (Authenticated)
+- `GET /favorites` - Get user's favorite recipes
+- `POST /favorites/{recipe_id}` - Add recipe to favorites
+- `DELETE /favorites/{recipe_id}` - Remove recipe from favorites
+
+### External APIs
+- `GET /api/recipes/external?q=chicken&number=10` - Search TheMealDB
+- `GET /recipes/search/ingredient?ingredient=chicken` - Search TheMealDB by ingredient
+
+## Key Features Explained
+
+### Pagination
+The `/api/recipes` endpoint supports pagination:
+- `skip`: Number of recipes to skip (default: 0)
+- `limit`: Number of recipes to return (default: 10)
+- Returns `has_more` flag to indicate if more recipes are available
+
+### Public vs Private Recipes
+- Recipes have an `is_public` field (boolean)
+- Public recipes appear in "All Recipes" and search results
+- Private recipes only appear in "My Recipes" for the owner
+
+### Ingredient Search
+- Searches the `ingredients` field in all public recipes
+- Case-insensitive search using SQL ILIKE
+- Optionally includes results from TheMealDB external API
 
 ## Testing
 
 Run the tests:
 ```bash
-pytest tests/
+pytest backend/tests/
+```
+
+Run with coverage:
+```bash
+pytest --cov=backend backend/tests/
 ```
 
 ## External API Integration
 
-The app supports integration with the Spoonacular API for additional recipe data:
+### TheMealDB (Free, No API Key Required)
+The app integrates with TheMealDB API for additional recipe data. No configuration needed!
+
+When you search with "Include external sources" checked, the app will:
+1. Search your local database for matching recipes
+2. Query TheMealDB for additional recipes
+3. Display both sets of results
+
+### Spoonacular (Optional, Requires API Key)
+If you want to use Spoonacular API:
 
 1. Sign up for a free API key at [Spoonacular](https://spoonacular.com/food-api)
 2. Add your API key to the `.env` file:
    ```
    SPOONACULAR_API_KEY=your-api-key-here
    ```
-3. Use the `/api/recipes/external` endpoint to search external recipes
+3. The app will automatically include Spoonacular results when available
+
+## Troubleshooting
+
+### "ModuleNotFoundError: No module named 'jwt'"
+- Make sure you installed `python-jose[cryptography]`, not `pyjwt`
+- Update imports in `auth.py`:
+  ```python
+  from jose import jwt
+  from jose.exceptions import JWTError
+  ```
+
+### "ValueError: password cannot be longer than 72 bytes"
+- Install the compatible bcrypt version:
+  ```bash
+  pip uninstall bcrypt
+  pip install bcrypt==4.0.1
+  ```
+
+### "Error loading ASGI app"
+- Make sure you're running from the project root
+- Use the correct command: `uvicorn backend.main:app --reload`
+- Check that `backend/__init__.py` exists
+
+### CORS Issues
+- The backend is configured to allow requests from `http://localhost:8000` and `http://127.0.0.1:8000`
+- If you're running on a different port, update the CORS settings in `backend/main.py`
 
 ## Deployment
 
-### Using Docker (recommended)
-```dockerfile
-# Create a Dockerfile
-FROM python:3.11-slim
+### Using Railway
+1. Connect your GitHub repository to Railway
+2. Add environment variables in Railway dashboard:
+   - `SECRET_KEY`
+   - `SPOONACULAR_API_KEY` (optional)
+3. Railway will auto-detect your Python app
+4. Deploy automatically on push
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+### Using Render
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set build command: `pip install -r requirements.txt`
+4. Set start command: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+5. Add environment variables in Render dashboard
 
-COPY . .
-EXPOSE 8000
+### Using Heroku
+1. Create a `Procfile` in your project root:
+   ```
+   web: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+   ```
+2. Deploy via Heroku CLI:
+   ```bash
+   heroku create your-app-name
+   git push heroku main
+   heroku config:set SECRET_KEY=your-secret-key
+   ```
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+### Manual Deployment (VPS)
+1. SSH into your server
+2. Clone your repository
+3. Set up virtual environment and install dependencies
+4. Use a process manager like systemd or supervisor
+5. Set up nginx as reverse proxy
+6. Configure SSL with Let's Encrypt
 
-### Using Cloud Platforms
-- **Heroku**: Use the provided configuration
-- **Railway**: Connect your GitHub repository
-- **Digital Oc
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Future Enhancements
+
+- [ ] Recipe categories and tags
+- [ ] Recipe ratings and reviews
+- [ ] Image upload functionality
+- [ ] Nutritional information
+- [ ] Shopping list generator
+- [ ] Meal planning calendar
+- [ ] Recipe sharing via URL
+- [ ] Social features (follow users, share recipes)
+
+## Support
+
+If you encounter any issues or have questions, please:
+1. Check the Troubleshooting section above
+2. Review the API documentation at `/docs`
+3. Open an issue on GitHub
+
+## Acknowledgments
+
+- TheMealDB for providing free recipe data
+- FastAPI for the excellent framework and documentation
+- All contributors who help improve this project

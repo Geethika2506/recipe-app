@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
-import jwt
-from jwt.exceptions import InvalidTokenError as JWTError
+from jose import jwt
+from jose.exceptions import JWTError  # Changed this line
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from . import models
 from .database import get_db
-
 load_dotenv()
 
 # Configuration - Use environment variables for security

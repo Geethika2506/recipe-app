@@ -25,7 +25,7 @@ app = FastAPI(
 # CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend URLs
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -213,31 +213,60 @@ async def remove_from_favorites(
     return {"message": "Recipe removed from favorites"}
 
 # ----------------- External API Integration -----------------
-@app.get("/api/recipes/mealdb")
-async def search_mealdb_recipes(i: str):
+# ----------------- External API Integration -----------------
+@app.get("/api/recipes/external", tags=["External"])
+async def search_external_recipes(q: str, number: int = 10):
     """Search recipes from TheMealDB by ingredient"""
     async with httpx.AsyncClient() as client:
-        # Step 1: Filter by ingredient
-        filter_res = await client.get(
-            "https://www.themealdb.com/api/json/v1/1/filter.php",
-            params={"i": i}
-        )
-        filter_data = filter_res.json()
-        if not filter_data or not filter_data.get("meals"):
-            return {"meals": []}
-
-        # Step 2: Lookup full recipes for first few results
-        recipes = []
-        for meal in filter_data["meals"][:5]:  # limit results
-            meal_id = meal["idMeal"]
-            lookup_res = await client.get(
-                "https://www.themealdb.com/api/json/v1/1/lookup.php",
-                params={"i": meal_id}
+        try:
+            # Filter by ingredient
+            filter_res = await client.get(
+                "https://www.themealdb.com/api/json/v1/1/filter.php",
+                params={"i": q},
+                timeout=10.0
             )
-            recipes.append(lookup_res.json())
+            filter_data = filter_res.json()
+            
+            if not filter_data or not filter_data.get("meals"):
+                return {"results": [], "total": 0}
 
-        return {"meals": recipes}
-
+            # Get full recipe details
+            results = []
+            for meal in filter_data["meals"][:number]:
+                meal_id = meal["idMeal"]
+                lookup_res = await client.get(
+                    "https://www.themealdb.com/api/json/v1/1/lookup.php",
+                    params={"i": meal_id},
+                    timeout=10.0
+                )
+                meal_detail = lookup_res.json().get("meals", [{}])[0]
+                
+                # Build ingredients list
+                ingredients = []
+                for i in range(1, 21):
+                    ingredient = meal_detail.get(f'strIngredient{i}')
+                    measure = meal_detail.get(f'strMeasure{i}')
+                    if ingredient and ingredient.strip():
+                        ingredients.append(f"{measure} {ingredient}".strip())
+                
+                results.append({
+                    'id': f"ext_{meal_detail['idMeal']}",
+                    'title': meal_detail.get('strMeal', 'Unknown'),
+                    'description': f"{meal_detail.get('strCategory', '')} - {meal_detail.get('strArea', '')}".strip(' - '),
+                    'image_url': meal_detail.get('strMealThumb'),
+                    'instructions': meal_detail.get('strInstructions', 'No instructions'),
+                    'ingredients': '\n'.join(ingredients),
+                    'difficulty': 'medium',
+                    'external': True
+                })
+            
+            return {'results': results, 'total': len(results)}
+            
+        except Exception as e:
+            print(f"External API error: {e}")
+            return {'results': [], 'total': 0}
+        
+        
 
 # ----------------- Root Route -----------------
 @app.get("/")
@@ -250,9 +279,33 @@ async def read_root():
         "docs": "/docs",
         "version": "1.0.0"
     }
-
-# ----------------- Health Check -----------------
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}
+#----------------- External API Category Route -----------------
+@app.get("/api/recipes/category", tags=["External"])
+async def get_recipes_by_category(c: str = "Seafood"):
+    """Get recipes by category from TheMealDB"""
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"https://www.themealdb.com/api/json/v1/1/filter.php?c={c}",
+                timeout=10.0
+            )
+            data = response.json()
+            
+            if not data or not data.get("meals"):
+                return {"results": [], "total": 0}
+            
+            results = []
+            for meal in data["meals"][:10]:  # Limit to 10 recipes per category
+                results.append({
+                    'id': f"ext_{meal['idMeal']}",
+                    'title': meal.get('strMeal', 'Unknown'),
+                    'image_url': meal.get('strMealThumb'),
+                    'description': c,
+                    'difficulty': 'medium',
+                    'external': True
+                })
+            
+            return {'results': results, 'total': len(results)}
+        except Exception as e:
+            print(f"Category API error: {e}")
+            return {'results': [], 'total': 0}

@@ -215,32 +215,65 @@ async function loadRecipes(reset = false) {
 
     showLoading(true);
     try {
-        const response = await fetch(`/recipes?skip=${currentPage * recipesPerPage}&limit=${recipesPerPage}`);
-        const recipes = await response.json();
-
-        if (response.ok) {
-            currentRecipes = reset ? recipes : [...currentRecipes, ...recipes];
-            displayRecipes(currentRecipes, 'recipe-grid');
-            currentPage++;
-
-            // Hide load more button if no more recipes
-            const loadMoreBtn = document.getElementById('load-more');
-            if (recipes.length < recipesPerPage) {
-                loadMoreBtn.style.display = 'none';
-            } else {
-                loadMoreBtn.style.display = 'block';
-            }
-        } else {
-            showToast('Error loading recipes', 'error');
+        // Fetch local recipes
+        const localResponse = await fetch(`/recipes?skip=${currentPage * recipesPerPage}&limit=${recipesPerPage}`);
+        
+        if (!localResponse.ok) {
+            throw new Error('Failed to load local recipes');
         }
+        
+        const localData = await localResponse.json();
+        
+        // Check if localData is an array or an object with a recipes property
+        const localRecipes = Array.isArray(localData) ? localData : (localData.recipes || []);
+        
+        let allRecipes = [...localRecipes];
+
+        // On first load, fetch external recipes
+        // On first load, fetch external recipes by category
+if (currentPage === 0) {
+    const categories = ['Pasta', 'Seafood', 'Chicken', 'Beef', 'Dessert', 'Vegetarian'];
+    
+    for (const category of categories) {
+        try {
+            const extResponse = await fetch(`/api/recipes/category?c=${category}`);
+            if (extResponse.ok) {
+                const extData = await extResponse.json();
+                if (extData.results && Array.isArray(extData.results)) {
+                    allRecipes.push(...extData.results);
+                }
+            }
+        } catch (err) {
+            console.log(`Skipping ${category}:`, err.message);
+        }
+    }
+    
+    // Remove duplicates by ID
+    const seen = new Set();
+    allRecipes = allRecipes.filter(recipe => {
+        const id = recipe.id;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+}
+        currentRecipes = reset ? allRecipes : [...currentRecipes, ...allRecipes];
+        displayRecipes(currentRecipes, 'recipe-grid');
+        currentPage++;
+
+        // Manage load more button
+        const loadMoreBtn = document.getElementById('load-more');
+        if (loadMoreBtn) {
+            loadMoreBtn.style.display = localRecipes.length < recipesPerPage ? 'none' : 'block';
+        }
+
     } catch (error) {
-        showToast('Network error loading recipes', 'error');
         console.error('Load recipes error:', error);
+        showToast('Error loading recipes: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
 }
-
 async function loadMyRecipes() {
     if (!authToken) {
         showToast('Please login to view your recipes', 'warning');
@@ -318,6 +351,7 @@ function displayRecipes(recipes, containerId, showActions = false) {
 function createRecipeCard(recipe, showActions = false) {
     const card = document.createElement('div');
     card.className = 'recipe-card';
+    const isExternal = recipe.external || String(recipe.id).startsWith('ext_');
     
     const imageUrl = recipe.image_url || 'https://via.placeholder.com/300x200?text=No+Image';
     const prepTime = recipe.prep_time ? `${recipe.prep_time}min prep` : '';
@@ -327,7 +361,7 @@ function createRecipeCard(recipe, showActions = false) {
     card.innerHTML = `
         <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
         <div class="recipe-content">
-            <h3 class="recipe-title">${recipe.title}</h3>
+            <h3 class="recipe-title">${recipe.title} ${isExternal ? '🌐' : ''}</h3>
             <p class="recipe-description">${recipe.description || 'No description available'}</p>
             <div class="recipe-meta">
                 <span class="recipe-time">
@@ -337,14 +371,14 @@ function createRecipeCard(recipe, showActions = false) {
                 <span class="recipe-difficulty">${recipe.difficulty || 'easy'}</span>
             </div>
             <div class="recipe-actions">
-                ${authToken ? `<button onclick="toggleFavorite(${recipe.id})" class="btn btn-favorite">
+                ${authToken && !isExternal ? `<button onclick="toggleFavorite(${recipe.id}); event.stopPropagation();" class="btn btn-favorite">
                     <i class="fas fa-heart"></i>
                 </button>` : ''}
-                ${showActions ? `
-                    <button onclick="editRecipe(${recipe.id})" class="btn btn-secondary">
+                ${showActions && !isExternal ? `
+                    <button onclick="editRecipe(${recipe.id}); event.stopPropagation();" class="btn btn-secondary">
                         <i class="fas fa-edit"></i> Edit
                     </button>
-                    <button onclick="deleteRecipe(${recipe.id})" class="btn btn-danger">
+                    <button onclick="deleteRecipe(${recipe.id}); event.stopPropagation();" class="btn btn-danger">
                         <i class="fas fa-trash"></i> Delete
                     </button>
                 ` : ''}
@@ -364,14 +398,45 @@ function createRecipeCard(recipe, showActions = false) {
 async function showRecipeDetails(recipeId) {
     showLoading(true);
     try {
-        const response = await fetch(`/recipes/${recipeId}`);
-        const recipe = await response.json();
-
-        if (response.ok) {
-            displayRecipeDetails(recipe);
+        // Check if external recipe (starts with "ext_")
+        if (String(recipeId).startsWith('ext_')) {
+            const mealId = String(recipeId).replace('ext_', '');
+            const response = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${mealId}`);
+            const data = await response.json();
+            const recipe = data.meals[0];
+            
+            // Build ingredients list
+            const ingredients = [];
+            for (let i = 1; i <= 20; i++) {
+                const ingredient = recipe[`strIngredient${i}`];
+                const measure = recipe[`strMeasure${i}`];
+                if (ingredient && ingredient.trim()) {
+                    ingredients.push(`${measure} ${ingredient}`.trim());
+                }
+            }
+            
+            const externalRecipe = {
+                title: recipe.strMeal,
+                image_url: recipe.strMealThumb,
+                description: `${recipe.strCategory} - ${recipe.strArea}`,
+                ingredients: ingredients.join('\n'),
+                instructions: recipe.strInstructions,
+                source_url: recipe.strYoutube
+            };
+            
+            displayRecipeDetails(externalRecipe);
             openModal('recipe-modal');
         } else {
-            showToast('Error loading recipe details', 'error');
+            // Local recipe
+            const response = await fetch(`/recipes/${recipeId}`);
+            const recipe = await response.json();
+
+            if (response.ok) {
+                displayRecipeDetails(recipe);
+                openModal('recipe-modal');
+            } else {
+                showToast('Error loading recipe details', 'error');
+            }
         }
     } catch (error) {
         showToast('Network error loading recipe details', 'error');
@@ -380,7 +445,6 @@ async function showRecipeDetails(recipeId) {
         showLoading(false);
     }
 }
-
 function displayRecipeDetails(recipe) {
     const detailsContainer = document.getElementById('recipe-details');
     const imageUrl = recipe.image_url || 'https://via.placeholder.com/400x250?text=No+Image';
@@ -550,7 +614,7 @@ async function toggleFavorite(recipeId) {
 }
 
 async function performSearch() {
-    const query = searchInput.value.trim();
+    const query = searchInput.value.trim().toLowerCase();
     if (!query) {
         showToast('Please enter a search term', 'warning');
         return;
@@ -558,15 +622,50 @@ async function performSearch() {
 
     showLoading(true);
     try {
-        const response = await fetch(`/recipes/search?q=${encodeURIComponent(query)}&limit=50`);
-        const recipes = await response.json();
+        // Categories that should use category search instead of ingredient search
+        const categories = [
+            'pasta', 'dessert', 'seafood', 'vegetarian', 'vegan', 'breakfast', 
+            'beef', 'chicken', 'lamb', 'pork', 'side', 'starter', 'goat',
+            'miscellaneous', 'soup', 'curry', 'salad'
+        ];
+        
+        const isCategory = categories.includes(query);
 
-        if (response.ok) {
-            displayRecipes(recipes, 'recipe-grid');
-            showSection('recipes');
-            showToast(`Found ${recipes.length} recipes for "${query}"`, 'success');
+        // Search local database
+        const localPromise = fetch(`/recipes/search?q=${encodeURIComponent(query)}&limit=20`).catch(() => null);
+        
+        // Search external API - use category or ingredient endpoint
+        let externalPromise;
+        if (isCategory) {
+            externalPromise = fetch(`/api/recipes/category?c=${encodeURIComponent(query)}`).catch(() => null);
         } else {
-            showToast('Error searching recipes', 'error');
+            externalPromise = fetch(`/api/recipes/external?q=${encodeURIComponent(query)}`).catch(() => null);
+        }
+
+        const [localResponse, externalResponse] = await Promise.all([localPromise, externalPromise]);
+
+        let localRecipes = [];
+        let externalRecipes = [];
+
+        if (localResponse && localResponse.ok) {
+            localRecipes = await localResponse.json();
+        }
+
+        if (externalResponse && externalResponse.ok) {
+            const externalData = await externalResponse.json();
+            externalRecipes = externalData.results || [];
+        }
+
+        const allRecipes = [...localRecipes, ...externalRecipes];
+
+        if (allRecipes.length > 0) {
+            displayRecipes(allRecipes, 'recipe-grid');
+            showSection('recipes');
+            showToast(`Found ${allRecipes.length} recipes (${localRecipes.length} yours, ${externalRecipes.length} from web)`, 'success');
+        } else {
+            displayRecipes([], 'recipe-grid');
+            showSection('recipes');
+            showToast('No recipes found. Try ingredients like "chicken", "milk" or categories like "pasta", "dessert"', 'warning');
         }
     } catch (error) {
         showToast('Network error searching recipes', 'error');
@@ -575,7 +674,6 @@ async function performSearch() {
         showLoading(false);
     }
 }
-
 // UI Helper functions
 function showSection(sectionId) {
     document.querySelectorAll('.section').forEach(section => {

@@ -10,7 +10,7 @@ A full-stack recipe management application built with FastAPI (backend) and vani
 - Protected routes for authenticated users
 - Secure password hashing with bcrypt
 
-### Recipe Management (CRUD)
+### personal Recipe Management (CRUD)
 - **Create**: Add new recipes with ingredients, instructions, prep/cook time, difficulty level
 - **Read**: Browse all public recipes with pagination, view detailed recipe information
 - **Update**: Edit your own recipes
@@ -27,6 +27,7 @@ A full-stack recipe management application built with FastAPI (backend) and vani
 - **My Recipes**: Manage all your created recipes
 - **Responsive Design**: Works on desktop and mobile devices
 - **Real-time Updates**: Changes reflect immediately
+-**Quick Search**: One-click search for popular categories and ingredients
 
 ## Tech Stack
 
@@ -89,6 +90,8 @@ SECRET_KEY=your-super-secret-jwt-key-here-make-it-long-and-random
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 DATABASE_URL=sqlite:///./recipes.db
 SPOONACULAR_API_KEY=your-spoonacular-api-key-here
+
+(use:https://spoonacular.com/food-api)
 ```
 
 **Generate a secure secret key:**
@@ -104,17 +107,10 @@ The database tables will be created automatically when you first run the applica
 # Run from project root
 uvicorn backend.main:app --reload
 
-# Or with custom host and port
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application will be available at: `http://127.0.0.1:8000`
 
-## API Documentation
-
-Once the server is running, you can access the interactive API documentation at:
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
 
 ## Project Structure
 

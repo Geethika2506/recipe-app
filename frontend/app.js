@@ -371,9 +371,9 @@ function createRecipeCard(recipe, showActions = false) {
                 <span class="recipe-difficulty">${recipe.difficulty || 'easy'}</span>
             </div>
             <div class="recipe-actions">
-                ${authToken && !isExternal ? `<button onclick="toggleFavorite(${recipe.id}); event.stopPropagation();" class="btn btn-favorite">
-                    <i class="fas fa-heart"></i>
-                </button>` : ''}
+                <button class="btn btn-favorite" onclick="handleFavoriteClick('${recipe.id}', ${isExternal}, event)">
+                    <i class="fas fa-heart"></i> ${isExternal ? 'Save' : ''}
+                </button>
                 ${showActions && !isExternal ? `
                     <button onclick="editRecipe(${recipe.id}); event.stopPropagation();" class="btn btn-secondary">
                         <i class="fas fa-edit"></i> Edit
@@ -391,8 +391,54 @@ function createRecipeCard(recipe, showActions = false) {
             showRecipeDetails(recipe.id);
         }
     });
-
+    if (isExternal) {
+        card.dataset.recipeData = JSON.stringify(recipe);
+    }
     return card;
+}
+
+async function handleFavoriteClick(recipeId, isExternal) {
+    if (!authToken) {
+        showToast('Please login to add favorites', 'warning');
+        return;
+    }
+
+    showLoading(true);
+    try {
+        if (isExternal) {
+            // Get the full recipe data from the card
+            const card = event.target.closest('.recipe-card');
+            const recipeData = JSON.parse(card.dataset.recipeData);
+            
+            // First save to database
+            showToast('Saving recipe to your collection...', 'info');
+            const savedId = await saveExternalRecipe(recipeData);
+            
+            if (savedId) {
+                // Then add to favorites
+                const response = await fetch(`/favorites/${savedId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                if (response.ok) {
+                    showToast('Recipe saved and added to favorites!', 'success');
+                } else {
+                    showToast('Recipe saved but could not add to favorites', 'warning');
+                }
+            } else {
+                showToast('Error saving recipe', 'error');
+            }
+        } else {
+            // Regular favorite toggle for your recipes
+            await toggleFavorite(recipeId);
+        }
+    } catch (error) {
+        showToast('Error processing favorite', 'error');
+        console.error('Favorite error:', error);
+    } finally {
+        showLoading(false);
+    }
 }
 
 async function showRecipeDetails(recipeId) {
@@ -610,6 +656,65 @@ async function toggleFavorite(recipeId) {
     } catch (error) {
         showToast('Network error updating favorites', 'error');
         console.error('Toggle favorite error:', error);
+    }
+}
+async function saveExternalRecipe(externalRecipe) {
+    if (!authToken) {
+        showToast('Please login to save recipes', 'warning');
+        return null;
+    }
+
+    try {
+        // Ensure ingredients is a string
+        let ingredientsStr = '';
+        if (typeof externalRecipe.ingredients === 'string') {
+            ingredientsStr = externalRecipe.ingredients;
+        } else if (Array.isArray(externalRecipe.ingredients)) {
+            ingredientsStr = externalRecipe.ingredients.join('\n');
+        }
+
+        // Ensure instructions is a string
+        let instructionsStr = externalRecipe.instructions || 'No instructions provided';
+        if (typeof instructionsStr !== 'string') {
+            instructionsStr = String(instructionsStr);
+        }
+
+        const recipeData = {
+            title: externalRecipe.title || 'Untitled Recipe',
+            description: externalRecipe.description || 'Recipe from TheMealDB',
+            ingredients: ingredientsStr || 'No ingredients listed',
+            instructions: instructionsStr,
+            image_url: externalRecipe.image_url || null,
+            difficulty: 'medium',
+            servings: 4,
+            prep_time: null,
+            cook_time: null
+        };
+
+        console.log('Saving recipe:', recipeData); // Debug log
+
+        const response = await fetch('/recipes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(recipeData)
+        });
+
+        if (response.ok) {
+            const savedRecipe = await response.json();
+            return savedRecipe.id;
+        } else {
+            const error = await response.json();
+            console.error('Save recipe error:', error);
+            showToast('Error: ' + (error.detail || 'Could not save recipe'), 'error');
+            return null;
+        }
+    } catch (error) {
+        console.error('Error saving external recipe:', error);
+        showToast('Network error saving recipe', 'error');
+        return null;
     }
 }
 

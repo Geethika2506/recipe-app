@@ -6,6 +6,10 @@ from . import models, schemas, auth
 # ----------------- User CRUD -----------------
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     """Create a new user"""
+    # Check for existing email or username
+    if get_user_by_email(db, user.email) or get_user_by_username(db, user.username):
+        raise ValueError("Email or username already registered")
+
     hashed_password = auth.get_password_hash(user.password)
     db_user = models.User(
         username=user.username,
@@ -16,6 +20,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 def get_user(db: Session, user_id: int) -> Optional[models.User]:
     """Get user by ID"""
@@ -32,7 +37,7 @@ def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
 # ----------------- Recipe CRUD -----------------
 def create_recipe(db: Session, recipe: schemas.RecipeCreate, user_id: int) -> models.Recipe:
     """Create a new recipe"""
-    db_recipe = models.Recipe(**recipe.dict(), owner_id=user_id)
+    db_recipe = models.Recipe(**recipe.model_dump(), owner_id=user_id)
     db.add(db_recipe)
     db.commit()
     db.refresh(db_recipe)
@@ -64,8 +69,8 @@ def update_recipe(db: Session, recipe_id: int, recipe_update: schemas.RecipeUpda
     
     if not db_recipe:
         return None
-    
-    update_data = recipe_update.dict(exclude_unset=True)
+
+    update_data = recipe_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_recipe, field, value)
     

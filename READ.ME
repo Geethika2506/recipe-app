@@ -72,7 +72,7 @@ source venv/bin/activate
 ```bash
 pip install fastapi uvicorn sqlalchemy python-multipart python-jose[cryptography] passlib[bcrypt]==1.7.4 bcrypt==4.0.1 httpx python-dotenv
 
-pip install fastapi uvicorn[standard] sqlalchemy passlib[bcrypt] python-jose[cryptography] python-multipart python-dotenv httpx pydantic[email]
+pip install fastapi uvicorn[standard] sqlalchemy passlib[bcrypt] python-multipart httpx pydantic[email] pyjwt
 ```
 
 **Important**: We use `bcrypt==4.0.1` for compatibility with `passlib`. Version 5.x causes issues.
@@ -86,10 +86,11 @@ pip install -r requirements.txt
 Create a `.env` file in the root directory:
 
 ```env
-SECRET_KEY=your-super-secret-jwt-key-here-make-it-long-and-random
+SPOONACULAR_API_KEY= ceb5873c927b458583e4bee1326573fd
+SECRET_KEY=tuhuNTARwMh7dRvYBGDKzDhZNmKRY0m_No_2Bj8qwCQ 
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 DATABASE_URL=sqlite:///./recipes.db
-SPOONACULAR_API_KEY=your-spoonacular-api-key-here
+
 
 (use:https://spoonacular.com/food-api)
 ```
@@ -236,6 +237,7 @@ The `/api/recipes` endpoint supports pagination:
 
 Run the tests:
 ```bash
+pip install pytest
 pytest backend/tests/
 ```
 

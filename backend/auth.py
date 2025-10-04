@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from . import models
 from .database import get_db
+from datetime import datetime, timedelta, timezone
 load_dotenv()
 
 # Configuration - Use environment variables for security
@@ -100,3 +101,12 @@ def get_current_active_user(
 ):
     """Get current active user"""
     return current_user
+
+
+
+def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt

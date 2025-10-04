@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 import re
@@ -11,7 +11,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-    @validator('username')
+    @field_validator('username')
     def validate_username(cls, v):
         if len(v) < 3:
             raise ValueError('Username must be at least 3 characters long')
@@ -19,7 +19,7 @@ class UserCreate(UserBase):
             raise ValueError('Username can only contain letters, numbers, and underscores')
         return v
 
-    @validator('password')
+    @field_validator('password')
     def validate_password(cls, v):
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters long')
@@ -30,8 +30,8 @@ class User(UserBase):
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class UserWithRecipes(User):
     recipes: List['Recipe'] = []
@@ -70,8 +70,8 @@ class Recipe(RecipeBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class RecipeWithOwner(Recipe):
     owner: User
@@ -87,8 +87,8 @@ class Favorite(BaseModel):
     created_at: datetime
     recipe: Recipe
 
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # ----------------- Auth -----------------
 class Token(BaseModel):

@@ -36,6 +36,7 @@ function setupEventListeners() {
             const section = e.target.getAttribute('href').substring(1);
             showSection(section);
             loadSectionData(section);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 

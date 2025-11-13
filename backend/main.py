@@ -8,9 +8,17 @@ from typing import List
 from datetime import timedelta
 import os
 import httpx
+import time
 
 from . import models, schemas, crud, auth
 from .database import engine, get_db
+
+# Metrics storage (in-memory)
+metrics = {
+    "request_count": 0,
+    "error_count": 0,
+    "total_latency": 0.0,
+}
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -19,7 +27,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Recipe Finder API",
     description="A recipe management system with user authentication and CRUD operations",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 # CORS middleware for frontend integration
@@ -31,9 +39,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Metrics tracking middleware
+@app.middleware("http")
+async def track_metrics(request, call_next):
+    start_time = time.time()
+    metrics["request_count"] += 1
+    
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        metrics["error_count"] += 1
+        raise e
+    finally:
+        latency = time.time() - start_time
+        metrics["total_latency"] += latency
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring"""
+    return {
+        "status": "healthy",
+        "version": "2.0.0",
+        "database": "connected"
+    }
+
+# Metrics endpoint
+@app.get("/metrics")
+def get_metrics():
+    """Expose application metrics"""
+    avg_latency = (
+        metrics["total_latency"] / metrics["request_count"]
+        if metrics["request_count"] > 0
+        else 0
+    )
+    
+    return {
+        "request_count": metrics["request_count"],
+        "error_count": metrics["error_count"],
+        "average_latency": round(avg_latency, 4),
+        "error_rate": (
+            round(metrics["error_count"] / metrics["request_count"] * 100, 2)
+            if metrics["request_count"] > 0
+            else 0
+        )
+    }
+
 # Mount static files (for frontend)
-if os.path.exists("frontend"):
-    app.mount("/static", StaticFiles(directory="frontend"), name="static")
+# Mount static files (for frontend)
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+else:
+    print(f"Warning: Frontend directory not found at {frontend_path}")
 
 # ----------------- Authentication Routes -----------------
 @app.post("/auth/register", response_model=schemas.User)
@@ -213,7 +272,6 @@ async def remove_from_favorites(
     return {"message": "Recipe removed from favorites"}
 
 # ----------------- External API Integration -----------------
-# ----------------- External API Integration -----------------
 @app.get("/api/recipes/external", tags=["External"])
 async def search_external_recipes(q: str, number: int = 10):
     """Search recipes from TheMealDB by ingredient"""
@@ -265,21 +323,8 @@ async def search_external_recipes(q: str, number: int = 10):
         except Exception as e:
             print(f"External API error: {e}")
             return {'results': [], 'total': 0}
-        
-        
 
-# ----------------- Root Route -----------------
-@app.get("/")
-async def read_root():
-    """Root endpoint"""
-    if os.path.exists("frontend/index.html"):
-        return FileResponse("frontend/index.html")
-    return {
-        "message": "Recipe Finder API",
-        "docs": "/docs",
-        "version": "1.0.0"
-    }
-#----------------- External API Category Route -----------------
+# ----------------- External API Category Route -----------------
 @app.get("/api/recipes/category", tags=["External"])
 async def get_recipes_by_category(c: str = "Seafood"):
     """Get recipes by category from TheMealDB"""
@@ -309,3 +354,21 @@ async def get_recipes_by_category(c: str = "Seafood"):
         except Exception as e:
             print(f"Category API error: {e}")
             return {'results': [], 'total': 0}
+
+# ----------------- Root Route -----------------
+@app.get("/")
+async def read_root():
+    """Root endpoint"""
+    frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+    index_path = os.path.join(frontend_path, "index.html")
+    
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    
+    return {
+        "message": "Recipe Finder API - Version 2.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "metrics": "/metrics",
+        "version": "2.0.0"
+    }

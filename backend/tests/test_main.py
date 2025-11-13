@@ -2,53 +2,81 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from ..database import Base, get_db
-from ..main import app
-from .. import models, crud, schemas
+from sqlalchemy.pool import StaticPool
+import uuid
+
+from backend.database import Base, get_db
+from backend.main import app
+from backend import models, crud, schemas
 
 
-# Test database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# Use in-memory database for testing
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-def override_get_db():
-    """Override database dependency for testing"""
+@pytest.fixture(scope="function")
+def db():
+    """Create fresh database for each test"""
+    Base.metadata.create_all(bind=engine)
+    db = TestingSessionLocal()
     try:
-        db = TestingSessionLocal()
         yield db
     finally:
         db.close()
+        Base.metadata.drop_all(bind=engine)
 
-app.dependency_overrides[get_db] = override_get_db
-
-@pytest.fixture
-def client():
-    """Create test client"""
-    Base.metadata.create_all(bind=engine)
-    yield TestClient(app)
-    Base.metadata.drop_all(bind=engine)
+@pytest.fixture(scope="function")
+def client(db):
+    """Create test client with database override"""
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass
+    
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
 
 @pytest.fixture
 def test_user(client):
     """Create and return test user with token"""
+    # Generate unique credentials for each test
+    unique_id = str(uuid.uuid4())[:8]
     user_data = {
-        "username": "testuser",
-        "email": "test@example.com",
+        "username": f"testuser_{unique_id}",
+        "email": f"test_{unique_id}@example.com",
         "password": "password123"
     }
+    
+    # Register user
     response = client.post("/auth/register", json=user_data)
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Registration failed: {response.json()}"
     
     # Login to get token
     login_data = {
-        "username": "testuser",
+        "username": user_data["username"],
         "password": "password123"
     }
     response = client.post("/auth/login", data=login_data)
+    assert response.status_code == 200, f"Login failed: {response.json()}"
     token = response.json()["access_token"]
     
-    return {"token": token, "user": user_data}
+    return {
+        "token": token, 
+        "user": user_data,
+        "username": user_data["username"],
+        "email": user_data["email"]
+    }
+
 
 class TestAuthenticationRoutes:
     """Test authentication endpoints"""
@@ -72,7 +100,7 @@ class TestAuthenticationRoutes:
         """Test registering with duplicate email fails"""
         user_data = {
             "username": "differentuser",
-            "email": "test@example.com",
+            "email": test_user["email"],  # Use existing email
             "password": "password123"
         }
         response = client.post("/auth/register", json=user_data)
@@ -83,7 +111,7 @@ class TestAuthenticationRoutes:
     def test_register_duplicate_username(self, client, test_user):
         """Test registering with duplicate username fails"""
         user_data = {
-            "username": "testuser",
+            "username": test_user["username"],  # Use existing username
             "email": "different@example.com",
             "password": "password123"
         }
@@ -95,7 +123,7 @@ class TestAuthenticationRoutes:
     def test_login_success(self, client, test_user):
         """Test successful login"""
         login_data = {
-            "username": "testuser",
+            "username": test_user["username"],
             "password": "password123"
         }
         response = client.post("/auth/login", data=login_data)
@@ -108,7 +136,7 @@ class TestAuthenticationRoutes:
     def test_login_wrong_password(self, client, test_user):
         """Test login with wrong password"""
         login_data = {
-            "username": "testuser",
+            "username": test_user["username"],
             "password": "wrongpassword"
         }
         response = client.post("/auth/login", data=login_data)
@@ -132,13 +160,14 @@ class TestAuthenticationRoutes:
         
         assert response.status_code == 200
         data = response.json()
-        assert data["username"] == "testuser"
-        assert data["email"] == "test@example.com"
+        assert data["username"] == test_user["username"]
+        assert data["email"] == test_user["email"]
     
     def test_get_current_user_no_token(self, client):
         """Test getting current user without token fails"""
         response = client.get("/auth/me")
         assert response.status_code == 401
+
 
 class TestRecipeRoutes:
     """Test recipe endpoints"""
@@ -323,6 +352,7 @@ class TestRecipeRoutes:
         response = client.delete(f"/recipes/{recipe_id}")
         assert response.status_code == 401
 
+
 class TestFavoriteRoutes:
     """Test favorite endpoints"""
     
@@ -399,6 +429,7 @@ class TestFavoriteRoutes:
         response = client.delete("/favorites/99999", headers=headers)
         assert response.status_code == 404
 
+
 class TestRootRoute:
     """Test root endpoint"""
     
@@ -407,6 +438,6 @@ class TestRootRoute:
         response = client.get("/")
         assert response.status_code == 200
 
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-    

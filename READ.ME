@@ -747,8 +747,7 @@ docker-compose build --no-cache
 #### Argon2 ImportError
 ```bash
 # Reinstall argon2
-pip uninstall argon2-cffi passlib
-pip install argon2-cffi==23.1.0 passlib[argon2]==1.7.4
+docker ps
 ```
 
 #### Tests Failing
@@ -806,3 +805,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Favorites system
 
 ---
+# Install argon2 directly in the running container
+docker-compose exec app pip install argon2-cffi argon2-cffi-bindings
+
+# Restart the container
+docker-compose restart app
+
+# Wait a few seconds
+sleep 5
+
+# Test registration
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser999",
+    "email": "test999@test.com",
+    "password": "test1234"
+  }'

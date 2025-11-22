@@ -2,9 +2,19 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# Install system dependencies including build tools for argon2
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    make \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements and install dependencies
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
 
 # Copy application code
 COPY backend/ ./backend/

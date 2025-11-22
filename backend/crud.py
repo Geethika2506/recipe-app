@@ -106,6 +106,14 @@ def search_recipes(db: Session, query: str, skip: int = 0, limit: int = 100) -> 
         .limit(limit)
         .all()
     )
+    
+def create_external_recipe(db: Session, recipe: schemas.RecipeCreate) -> models.Recipe:
+    """Create an external recipe (no owner) for favoriting"""
+    db_recipe = models.Recipe(**recipe.model_dump(), owner_id=None)
+    db.add(db_recipe)
+    db.commit()
+    db.refresh(db_recipe)
+    return db_recipe
 
 # ----------------- Favorite CRUD -----------------
 def add_favorite(db: Session, user_id: int, recipe_id: int) -> models.Favorite:
@@ -139,10 +147,12 @@ def remove_favorite(db: Session, user_id: int, recipe_id: int) -> bool:
 
 def get_user_favorites(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[models.Favorite]:
     """Get user's favorite recipes"""
-    return (
+    favourites = (
         db.query(models.Favorite)
         .filter(models.Favorite.user_id == user_id)
         .offset(skip)
         .limit(limit)
         .all()
     )
+    
+    return [fav.recipe for fav in favourites if fav.recipe]

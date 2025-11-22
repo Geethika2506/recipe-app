@@ -208,6 +208,27 @@ async def create_recipe(
     """Create a new recipe"""
     return crud.create_recipe(db=db, recipe=recipe, user_id=current_user.id)
 
+# Add this new route after your existing @app.post("/recipes") endpoint
+
+@app.post("/recipes/external", response_model=schemas.Recipe)
+async def save_external_recipe(
+    recipe: schemas.RecipeCreate,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Save an external recipe without owner (for favorites only)"""
+    # Check if recipe already exists (by title) as external recipe
+    existing = db.query(models.Recipe).filter(
+        models.Recipe.title == recipe.title,
+        models.Recipe.owner_id == None
+    ).first()
+    
+    if existing:
+        return existing
+    
+    # Create external recipe without owner
+    return crud.create_external_recipe(db, recipe=recipe)
+
 @app.put("/recipes/{recipe_id}", response_model=schemas.Recipe)
 async def update_recipe(
     recipe_id: int,
@@ -234,7 +255,7 @@ async def delete_recipe(
     return {"message": "Recipe deleted successfully"}
 
 # ----------------- Favorites Routes -----------------
-@app.get("/favorites", response_model=List[schemas.Favorite])
+@app.get("/favorites", response_model=List[schemas.Recipe])
 async def read_favorites(
     skip: int = 0,
     limit: int = 100,

@@ -35,7 +35,7 @@ class Recipe(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Foreign keys
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Relationships
     owner = relationship("User", back_populates="recipes")

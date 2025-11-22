@@ -318,10 +318,9 @@ async function loadFavorites() {
             }
         });
 
-        const favorites = await response.json();
-
         if (response.ok) {
-            const favoriteRecipes = favorites.map(fav => fav.recipe);
+            const favoriteRecipes = await response.json();
+            // API now returns recipes directly, not {recipe: ...} objects
             displayFavoriteRecipes(favoriteRecipes, 'favorites-grid');
         } else {
             showToast('Error loading favorites', 'error');
@@ -337,47 +336,60 @@ function displayFavoriteRecipes(recipes, containerId) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
 
-    if (recipes.length === 0) {
+    // Filter out any null/undefined recipes
+    const validRecipes = recipes.filter(recipe =>{
+        return recipe != null && typeof recipe === 'object' && recipe.id;
+
+    });
+
+    if (validRecipes.length === 0) {
         container.innerHTML = '<div class="no-recipes"><p>No favorites yet. Add recipes to favorites to see them here!</p></div>';
         return;
     }
 
-    recipes.forEach(recipe => {
-        const card = document.createElement('div');
-        card.className = 'recipe-card';
-        
-        const imageUrl = recipe.image_url || 'https://via.placeholder.com/300x200?text=No+Image';
-        const prepTime = recipe.prep_time ? `${recipe.prep_time}min prep` : '';
-        const cookTime = recipe.cook_time ? `${recipe.cook_time}min cook` : '';
-        const timeInfo = [prepTime, cookTime].filter(t => t).join(' • ');
+    validRecipes.forEach(recipe => {
+        try {
+            const card = document.createElement('div');
+            card.className = 'recipe-card';
+            
+            // Safely handle missing properties
+            const imageUrl = recipe.image_url || 'https://via.placeholder.com/300x200?text=No+Image';
+            const title = recipe.title || 'Untitled Recipe';
+            const description = recipe.description || 'No description available';
+            const prepTime = recipe.prep_time ? `${recipe.prep_time}min prep` : '';
+            const cookTime = recipe.cook_time ? `${recipe.cook_time}min cook` : '';
+            const timeInfo = [prepTime, cookTime].filter(t => t).join(' • ');
 
-        card.innerHTML = `
-            <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
-            <div class="recipe-content">
-                <h3 class="recipe-title">${recipe.title}</h3>
-                <p class="recipe-description">${recipe.description || 'No description available'}</p>
-                <div class="recipe-meta">
-                    <span class="recipe-time">
-                        <i class="fas fa-clock"></i>
-                        ${timeInfo || 'Time not specified'}
-                    </span>
-                    <span class="recipe-difficulty">${recipe.difficulty || 'medium'}</span>
+            card.innerHTML = `
+                <img src="${imageUrl}" alt="${title}" class="recipe-image" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+                <div class="recipe-content">
+                    <h3 class="recipe-title">${title}</h3>
+                    <p class="recipe-description">${description}</p>
+                    <div class="recipe-meta">
+                        <span class="recipe-time">
+                            <i class="fas fa-clock"></i>
+                            ${timeInfo || 'Time not specified'}
+                        </span>
+                        <span class="recipe-difficulty">${recipe.difficulty || 'medium'}</span>
+                    </div>
+                    <div class="recipe-actions">
+                        <button onclick="removeFavorite(${recipe.id}); event.stopPropagation();" class="btn btn-danger">
+                            <i class="fas fa-heart-broken"></i> Remove
+                        </button>
+                    </div>
                 </div>
-                <div class="recipe-actions">
-                    <button onclick="removeFavorite(${recipe.id}); event.stopPropagation();" class="btn btn-danger">
-                        <i class="fas fa-heart-broken"></i> Remove
-                    </button>
-                </div>
-            </div>
-        `;
+            `;
 
-        card.addEventListener('click', (e) => {
-            if (!e.target.closest('button')) {
-                showRecipeDetails(recipe.id);
-            }
-        });
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('button')) {
+                    showRecipeDetails(recipe.id);
+                }
+            });
 
-        container.appendChild(card);
+            container.appendChild(card);
+        } catch (error) {
+            console.error('Error rendering recipe card:', error, recipe);
+        }
     });
 }
 // Original function for home/recipes/search tabs
@@ -526,10 +538,12 @@ function createRecipeCard(recipe, showActions = false) {
 }
 
 async function handleFavoriteClick(recipeId, isExternal) {
+
     if (!authToken) {
         showToast('Please login to add favorites', 'warning');
         return;
     }
+    
 
     showLoading(true);
     try {
@@ -821,7 +835,7 @@ async function saveExternalRecipe(externalRecipe) {
 
         console.log('Saving recipe:', recipeData); // Debug log
 
-        const response = await fetch('/recipes', {
+        const response = await fetch('/recipes/external', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

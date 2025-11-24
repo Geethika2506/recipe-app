@@ -822,3 +822,17 @@ curl -X POST http://localhost:8000/auth/register \
     "email": "test999@test.com",
     "password": "test1234"
   }'
+
+  Start grafana and prometheus
+  cd ~/Desktop/year\ three/recipe-app-2
+  docker-compose start grafana prometheus
+
+Grafana: Open http://localhost:3000 in your browser
+
+Default login: username-admin /password- admin
+You'll be prompted to change the password on first login
+
+
+Prometheus: Open http://localhost:9090
+
+No login required

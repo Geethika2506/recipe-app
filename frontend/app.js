@@ -537,51 +537,176 @@ function createRecipeCard(recipe, showActions = false) {
     return card;
 }
 
-async function handleFavoriteClick(recipeId, isExternal) {
+// Replace your handleFavoriteClick function with this improved version:
+
+// In app.js, replace the existing handleFavoriteClick function with this:
+
+async function handleFavoriteClick(recipeId, isExternal, event) {
+    event.stopPropagation();
 
     if (!authToken) {
         showToast('Please login to add favorites', 'warning');
         return;
     }
-    
 
-    showLoading(true);
+    // Find the button to add a loading spinner effect (optional but good UX)
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    btn.disabled = true;
+
+    console.log('=== Starting Favorite Click ===');
+
     try {
         if (isExternal) {
-            // Get the full recipe data from the card
+            // Get the current partial data from the card
             const card = event.target.closest('.recipe-card');
-            const recipeData = JSON.parse(card.dataset.recipeData);
-            
-            // First save to database
-            showToast('Saving recipe to your collection...', 'info');
-            const savedId = await saveExternalRecipe(recipeData);
-            
-            if (savedId) {
-                // Then add to favorites
-                const response = await fetch(`/favorites/${savedId}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+            if (!card || !card.dataset.recipeData) {
+                throw new Error('Recipe data not found on card');
+            }
+
+            let recipeData = JSON.parse(card.dataset.recipeData);
+
+            // CHECK: Does this recipe have instructions? 
+            // Recipes from Category search (Home page) usually DON'T.
+            if (!recipeData.instructions || !recipeData.ingredients || 
+                recipeData.instructions === 'No instructions provided') {
                 
-                if (response.ok) {
-                    showToast('Recipe saved and added to favorites!', 'success');
+                console.log('Recipe details missing, fetching full info from external API...');
+                
+                // Extract the external ID (remove 'ext_' prefix)
+                const extId = String(recipeData.id).replace('ext_', '');
+                
+                // Fetch full details
+                const lookupRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${extId}`);
+                const lookupData = await lookupRes.json();
+                
+                if (lookupData.meals && lookupData.meals[0]) {
+                    const fullMeal = lookupData.meals[0];
+                    
+                    // Helper to process ingredients
+                    const ingredients = [];
+                    for (let i = 1; i <= 20; i++) {
+                        const ingredient = fullMeal[`strIngredient${i}`];
+                        const measure = fullMeal[`strMeasure${i}`];
+                        if (ingredient && ingredient.trim()) {
+                            ingredients.push(`${measure} ${ingredient}`.trim());
+                        }
+                    }
+
+                    // Update our recipeData with the full details
+                    recipeData = {
+                        ...recipeData,
+                        instructions: fullMeal.strInstructions,
+                        ingredients: ingredients.join('\n'),
+                        image_url: fullMeal.strMealThumb,
+                        source_url: fullMeal.strYoutube
+                    };
+                    
+                    // Update the card data so subsequent clicks are faster
+                    card.dataset.recipeData = JSON.stringify(recipeData);
+                }
+            }
+
+            // Prepare Payload for Backend
+            const payload = {
+                title: String(recipeData.title || 'Untitled Recipe'),
+                description: String(recipeData.description || 'Recipe from external source'),
+                ingredients: formatIngredients(recipeData.ingredients),
+                instructions: String(recipeData.instructions || 'No instructions provided'),
+                image_url: recipeData.image_url || null,
+                difficulty: String(recipeData.difficulty || 'medium'),
+                servings: 4,
+                prep_time: null,
+                cook_time: null
+            };
+
+            console.log('Sending payload:', payload);
+
+            const response = await fetch('/favorites/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            // Handle non-JSON responses (which cause "Network Error")
+            const contentType = response.headers.get("content-type");
+            let result;
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                result = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(`Server returned non-JSON error: ${response.status}`);
+            }
+
+            if (response.ok) {
+                if (result.message && result.message.includes('already')) {
+                    showToast('Recipe already in favorites!', 'info');
                 } else {
-                    showToast('Recipe saved but could not add to favorites', 'warning');
+                    showToast('Added to favorites!', 'success');
+                    // Update button state visually
+                    btn.innerHTML = '<i class="fas fa-heart"></i> Saved';
+                    btn.classList.add('saved');
                 }
             } else {
-                showToast('Error saving recipe', 'error');
+                console.error('Server error:', result);
+                showToast(result.detail || 'Error adding to favorites', 'error');
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
             }
         } else {
-            // Regular favorite toggle for your recipes
+            // Local recipes logic
             await toggleFavorite(recipeId);
+            btn.innerHTML = originalContent; // Reset button or change based on toggle
+            btn.disabled = false;
         }
     } catch (error) {
-        showToast('Error processing favorite', 'error');
         console.error('Favorite error:', error);
-    } finally {
-        showLoading(false);
+        showToast('Error: ' + error.message, 'error');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
     }
 }
+// Improved toggleFavorite for local recipes
+async function toggleFavorite(recipeId) {
+    if (!authToken) {
+        showToast('Please login to add favorites', 'warning');
+        return;
+    }
+
+    try {
+        // Try to add to favorites
+        const response = await fetch(`/favorites/${recipeId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            if (data.message.includes('already')) {
+                showToast('Already in favorites!', 'info');
+            } else {
+                showToast('Added to favorites!', 'success');
+            }
+        } else if (response.status === 404) {
+            showToast('Recipe not found', 'error');
+        } else {
+            showToast(data.detail || 'Error updating favorites', 'error');
+        }
+    } catch (error) {
+        showToast('Network error updating favorites', 'error');
+        console.error('Toggle favorite error:', error);
+    }
+}
+
+// You can remove the saveExternalRecipe function since it's no longer needed
+// The new /favorites/add endpoint handles everything in one call
 
 async function showRecipeDetails(recipeId) {
     showLoading(true);
@@ -763,43 +888,6 @@ async function deleteRecipe(recipeId) {
     }
 }
 
-async function toggleFavorite(recipeId) {
-    if (!authToken) {
-        showToast('Please login to add favorites', 'warning');
-        return;
-    }
-
-    try {
-        // Try to add to favorites first
-        const response = await fetch(`/favorites/${recipeId}`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`
-            }
-        });
-
-        if (response.ok) {
-            showToast('Added to favorites!', 'success');
-        } else if (response.status === 400) {
-            // If already exists, try to remove
-            const removeResponse = await fetch(`/favorites/${recipeId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${authToken}`
-                }
-            });
-            
-            if (removeResponse.ok) {
-                showToast('Removed from favorites', 'success');
-            }
-        } else {
-            showToast('Error updating favorites', 'error');
-        }
-    } catch (error) {
-        showToast('Network error updating favorites', 'error');
-        console.error('Toggle favorite error:', error);
-    }
-}
 async function saveExternalRecipe(externalRecipe) {
     if (!authToken) {
         showToast('Please login to save recipes', 'warning');
@@ -1067,4 +1155,87 @@ async function editRecipe(recipeId) {
         showToast('Error loading recipe for edit', 'error');
         console.error('Edit recipe fetch error:', error);
     }
+}
+
+// Helper function to ensure ingredients is a proper string
+function formatIngredients(ingredients) {
+    if (!ingredients) {
+        return 'No ingredients listed';
+    }
+    
+    if (typeof ingredients === 'string') {
+        return ingredients;
+    }
+    
+    if (Array.isArray(ingredients)) {
+        return ingredients.filter(i => i && i.trim()).join('\n');
+    }
+    
+    // If it's an object or something else, try to stringify it
+    return String(ingredients);
+}
+
+// ALSO UPDATE your createRecipeCard to ensure recipe data is properly stored:
+function createRecipeCard(recipe, showActions = false) {
+    const card = document.createElement('div');
+    card.className = 'recipe-card';
+    const isExternal = recipe.external || String(recipe.id).startsWith('ext_');
+    
+    const imageUrl = recipe.image_url || 'https://via.placeholder.com/300x200?text=No+Image';
+    const prepTime = recipe.prep_time ? `${recipe.prep_time}min prep` : '';
+    const cookTime = recipe.cook_time ? `${recipe.cook_time}min cook` : '';
+    const timeInfo = [prepTime, cookTime].filter(t => t).join(' • ');
+
+    card.innerHTML = `
+        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+        <div class="recipe-content">
+            <h3 class="recipe-title">${recipe.title} ${isExternal ? '🌐' : ''}</h3>
+            <p class="recipe-description">${recipe.description || 'No description available'}</p>
+            <div class="recipe-meta">
+                <span class="recipe-time">
+                    <i class="fas fa-clock"></i>
+                    ${timeInfo || 'Time not specified'}
+                </span>
+                <span class="recipe-difficulty">${recipe.difficulty || 'easy'}</span>
+            </div>
+            <div class="recipe-actions">
+                <button class="btn btn-favorite" onclick="handleFavoriteClick('${recipe.id}', ${isExternal}, event)">
+                    <i class="fas fa-heart"></i> ${isExternal ? 'Save' : 'Favorite'}
+                </button>
+                ${showActions && !isExternal ? `
+                    <button onclick="editRecipe(${recipe.id}); event.stopPropagation();" class="btn btn-secondary">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button onclick="deleteRecipe(${recipe.id}); event.stopPropagation();" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+    card.addEventListener('click', (e) => {
+        if (!e.target.closest('button')) {
+            showRecipeDetails(recipe.id);
+        }
+    });
+
+    // Store complete recipe data for external recipes
+    if (isExternal) {
+        // Make sure we have all the data we need
+        const completeRecipeData = {
+            id: recipe.id,
+            title: recipe.title,
+            description: recipe.description || '',
+            ingredients: recipe.ingredients || '',
+            instructions: recipe.instructions || '',
+            image_url: recipe.image_url || null,
+            difficulty: recipe.difficulty || 'medium',
+            external: true
+        };
+        card.dataset.recipeData = JSON.stringify(completeRecipeData);
+        console.log('Stored recipe data on card:', completeRecipeData);
+    }
+    
+    return card;
 }

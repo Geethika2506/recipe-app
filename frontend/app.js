@@ -304,35 +304,56 @@ async function loadMyRecipes() {
 }
 
 async function loadFavorites() {
+    console.log('=== loadFavorites START ===');
+    
     if (!authToken) {
+        console.log('No auth token');
         showToast('Please login to view favorites', 'warning');
         return;
     }
 
+    console.log('Auth token exists:', authToken ? 'yes' : 'no');
     showLoading(true);
+    
     try {
+        console.log('Fetching favorites from /favorites...');
         const response = await fetch('/favorites', {
             headers: {
                 'Authorization': `Bearer ${authToken}`
             }
         });
 
-        const favorites = await response.json();
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
 
         if (response.ok) {
-            const favoriteRecipes = favorites.map(fav => fav.recipe);
-            displayRecipes(favoriteRecipes, 'favorites-grid');
+            const favorites = await response.json();
+            console.log('Parsed favorites:', JSON.stringify(favorites, null, 2));
+            console.log('Favorites type:', typeof favorites);
+            console.log('Is array:', Array.isArray(favorites));
+            console.log('Length:', favorites ? favorites.length : 0);
+            
+            if (favorites && favorites.length > 0) {
+                console.log('First favorite structure:', JSON.stringify(favorites[0], null, 2));
+            }
+            
+            displayFavorites(favorites, 'favorites-grid');
         } else {
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
             showToast('Error loading favorites', 'error');
         }
     } catch (error) {
-        showToast('Network error loading favorites', 'error');
-        console.error('Load favorites error:', error);
+        console.error('=== CATCH BLOCK ===');
+        console.error('Error type:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        showToast('Network error loading favorites: ' + error.message, 'error');
     } finally {
+        console.log('=== loadFavorites END ===');
         showLoading(false);
     }
 }
-
 function displayRecipes(recipes, containerId, showActions = false) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';

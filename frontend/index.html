@@ -27,50 +27,51 @@
     </nav>
 
     <!-- Main Content -->
-    <!-- Hero Section -->
-<section id="home" class="section active">
-    <div class="hero">
-        <h1>Find Your Perfect Recipe</h1>
-        <p>Discover, save, and share amazing recipes from around the world</p>
-        <div class="search-container">
-            <input type="text" id="search-input" placeholder="Search for recipes..." class="search-input">
-            <button id="search-btn" class="search-btn">
-                <i class="fas fa-search"></i>
-            </button>
-        </div>
-        
-        <!-- Quick Search Suggestions -->
-        <div class="quick-search">
-            <div class="quick-search-section">
-                <h3><i class="fas fa-list"></i> Browse by Category</h3>
-                <div class="quick-search-buttons">
-                    <button class="quick-btn" onclick="quickSearch('chicken')">Chicken</button>
-                    <button class="quick-btn" onclick="quickSearch('beef')">Beef</button>
-                    <button class="quick-btn" onclick="quickSearch('seafood')">Seafood</button>
-                    <button class="quick-btn" onclick="quickSearch('pasta')">Pasta</button>
-                    <button class="quick-btn" onclick="quickSearch('dessert')">Dessert</button>
-                    <button class="quick-btn" onclick="quickSearch('vegetarian')">Vegetarian</button>
-                    <button class="quick-btn" onclick="quickSearch('vegan')">Vegan</button>
-                    <button class="quick-btn" onclick="quickSearch('breakfast')">Breakfast</button>
+    <main class="main-content">
+        <!-- Hero Section -->
+        <section id="home" class="section active">
+            <div class="hero">
+                <h1>Find Your Perfect Recipe</h1>
+                <p>Discover, save, and share amazing recipes from around the world</p>
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Search for recipes..." class="search-input">
+                    <button id="search-btn" class="search-btn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                
+                <!-- Quick Search Suggestions -->
+                <div class="quick-search">
+                    <div class="quick-search-section">
+                        <h3><i class="fas fa-list"></i> Browse by Category</h3>
+                        <div class="quick-search-buttons">
+                            <button class="quick-btn" onclick="quickSearch('chicken')">Chicken</button>
+                            <button class="quick-btn" onclick="quickSearch('beef')">Beef</button>
+                            <button class="quick-btn" onclick="quickSearch('seafood')">Seafood</button>
+                            <button class="quick-btn" onclick="quickSearch('pasta')">Pasta</button>
+                            <button class="quick-btn" onclick="quickSearch('dessert')">Dessert</button>
+                            <button class="quick-btn" onclick="quickSearch('vegetarian')">Vegetarian</button>
+                            <button class="quick-btn" onclick="quickSearch('vegan')">Vegan</button>
+                            <button class="quick-btn" onclick="quickSearch('breakfast')">Breakfast</button>
+                        </div>
+                    </div>
+                    
+                    <div class="quick-search-section">
+                        <h3><i class="fas fa-carrot"></i> Search by Ingredient</h3>
+                        <div class="quick-search-buttons">
+                            <button class="quick-btn" onclick="quickSearch('milk')">Milk</button>
+                            <button class="quick-btn" onclick="quickSearch('cheese')">Cheese</button>
+                            <button class="quick-btn" onclick="quickSearch('egg')">Eggs</button>
+                            <button class="quick-btn" onclick="quickSearch('tomato')">Tomato</button>
+                            <button class="quick-btn" onclick="quickSearch('potato')">Potato</button>
+                            <button class="quick-btn" onclick="quickSearch('rice')">Rice</button>
+                            <button class="quick-btn" onclick="quickSearch('garlic')">Garlic</button>
+                            <button class="quick-btn" onclick="quickSearch('lemon')">Lemon</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="quick-search-section">
-                <h3><i class="fas fa-carrot"></i> Search by Ingredient</h3>
-                <div class="quick-search-buttons">
-                    <button class="quick-btn" onclick="quickSearch('milk')">Milk</button>
-                    <button class="quick-btn" onclick="quickSearch('cheese')">Cheese</button>
-                    <button class="quick-btn" onclick="quickSearch('egg')">Eggs</button>
-                    <button class="quick-btn" onclick="quickSearch('tomato')">Tomato</button>
-                    <button class="quick-btn" onclick="quickSearch('potato')">Potato</button>
-                    <button class="quick-btn" onclick="quickSearch('rice')">Rice</button>
-                    <button class="quick-btn" onclick="quickSearch('garlic')">Garlic</button>
-                    <button class="quick-btn" onclick="quickSearch('lemon')">Lemon</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+        </section>
 
         <!-- Recipes Section -->
         <section id="recipes" class="section">

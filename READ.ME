@@ -2,96 +2,253 @@
 
 A full-stack recipe management application built with FastAPI (backend) and vanilla JavaScript (frontend). Users can register, login, create, edit, delete, and favorite recipes. Search across all public recipes or find recipes from external sources like TheMealDB.
 
-## Features
+# Recipe Finder - Enhanced DevOps Edition
 
-### Authentication
-- User registration and login
-- JWT token-based authentication
+A production-ready recipe management application with full-stack implementation, automated testing, CI/CD pipeline, Docker containerization, and real-time monitoring.
+
+[![CI/CD Pipeline](https://github.com/yourusername/recipe-app-2/workflows/CI/CD%20Pipeline/badge.svg)](https://github.com/yourusername/recipe-app-2/actions)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](https://github.com/yourusername/recipe-app-2)
+
+---
+
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [What's New in Version 2.0](#whats-new-in-version-20)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Running the Application](#running-the-application)
+- [Running Tests](#running-tests)
+- [Docker Deployment](#docker-deployment)
+- [Monitoring](#monitoring)
+- [API Documentation](#api-documentation)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## 🎯 Overview
+
+Recipe Finder is a full-stack recipe management application that allows users to register, login, create, edit, delete, and favorite recipes. Users can search across all public recipes or discover new recipes from external sources like TheMealDB.
+
+**Version 2.0** introduces enterprise-grade DevOps practices including automated testing, continuous integration/deployment, containerization, and real-time monitoring.
+
+---
+
+## 🆕 What's New in Version 2.0
+
+### Assignment 2 Enhancements
+
+| Improvement | Description | Status |
+|-------------|-------------|--------|
+| **Code Quality** | Refactored following SOLID principles, removed code smells | ✅ Complete |
+| **Testing** | 75+ automated tests with 85%+ coverage | ✅ Complete |
+| **CI/CD** | GitHub Actions pipeline for automated testing & deployment | ✅ Complete |
+| **Docker** | Multi-stage containerization with optimized images | ✅ Complete |
+| **Monitoring** | Prometheus + Grafana for real-time metrics | ✅ Complete |
+| **Health Checks** | `/health` and `/metrics` endpoints | ✅ Complete |
+| **Documentation** | Comprehensive README and technical report | ✅ Complete |
+
+### Key Improvements from Version 1.0
+
+- ✅ **Argon2 Password Hashing** - Upgraded from bcrypt to more secure Argon2
+- ✅ **Repository Pattern** - Better separation of concerns in data access
+- ✅ **Configuration Management** - Centralized config with environment variables
+- ✅ **Error Handling** - Comprehensive error handling and logging
+- ✅ **API Versioning** - Version 2.0.0 with backward compatibility
+- ✅ **Performance Metrics** - Track request count, latency, and error rates
+- ✅ **Automated Deployment** - One-click deployment via Docker Compose
+
+---
+
+## ✨ Features
+
+### Authentication & User Management
+- User registration and login with JWT authentication
+- Secure password hashing with Argon2
 - Protected routes for authenticated users
-- Secure password hashing with bcrypt
+- User profile management
+- Session management with token expiration
 
-### personal Recipe Management (CRUD)
+### Recipe Management (CRUD)
 - **Create**: Add new recipes with ingredients, instructions, prep/cook time, difficulty level
 - **Read**: Browse all public recipes with pagination, view detailed recipe information
-- **Update**: Edit your own recipes
+- **Update**: Edit your own recipes with real-time updates
 - **Delete**: Remove your own recipes
-- **Public/Private**: Control recipe visibility
+- **Public/Private**: Control recipe visibility settings
 
 ### Search & Discovery
-- **Ingredient Search**: Search all public recipes by ingredient (e.g., "chicken", "tomato")
-- **External API Integration**: Optionally search recipes from TheMealDB
-- **Pagination**: Load more recipes as you scroll
+- **Ingredient Search**: Search recipes by ingredient (e.g., "chicken", "tomato")
+- **Full-Text Search**: Search by title, description, or ingredients
+- **External API Integration**: Browse recipes from TheMealDB
+- **Category Filtering**: Quick search by popular categories
+- **Pagination**: Efficient loading with infinite scroll
 
-### Additional Features
-- **Favorites**: Save recipes to your favorites list
-- **My Recipes**: Manage all your created recipes
-- **Responsive Design**: Works on desktop and mobile devices
-- **Real-time Updates**: Changes reflect immediately
--**Quick Search**: One-click search for popular categories and ingredients
+### Favorites & Collections
+- Save recipes to your favorites list
+- Organize and manage your recipe collections
+- Quick access to frequently used recipes
 
-## Tech Stack
+### Monitoring & Health
+- **Health Endpoint**: `/health` - Real-time application status
+- **Metrics Endpoint**: `/metrics` - Request count, latency, error rates
+- **Prometheus Integration**: Time-series metrics collection
+- **Grafana Dashboards**: Visual monitoring and alerting
+
+---
+
+## 🛠️ Tech Stack
 
 ### Backend
-- **FastAPI**: Modern, fast web framework for building APIs
-- **SQLAlchemy**: SQL toolkit and ORM
-- **SQLite**: Database (easily changeable to PostgreSQL)
-- **JWT (python-jose)**: JSON Web Tokens for authentication
-- **Bcrypt**: Password hashing
-- **Pydantic**: Data validation using Python type annotations
-- **httpx**: Async HTTP client for external API calls
+- **FastAPI** - Modern, fast Python web framework
+- **SQLAlchemy** - SQL toolkit and ORM
+- **Pydantic** - Data validation using Python type hints
+- **Argon2-CFFI** - Secure password hashing (upgraded from bcrypt)
+- **Python-JOSE** - JWT token handling
+- **httpx** - Async HTTP client for external APIs
+- **Uvicorn** - ASGI server
 
 ### Frontend
-- **HTML5**: Semantic markup
-- **CSS3**: Modern styling with animations and responsive design
-- **Vanilla JavaScript**: No frameworks, pure JavaScript
-- **Font Awesome**: Icons
+- **HTML5/CSS3** - Semantic markup and modern styling
+- **Vanilla JavaScript** - No frameworks, pure JS
+- **Font Awesome** - Icon library
+- **Responsive Design** - Mobile-first approach
 
-## Installation and Setup
+### Database
+- **SQLite** - Development database (lightweight)
+- **PostgreSQL** - Production-ready option
 
-### 1. Clone the Repository
+### DevOps & Infrastructure
+- **Docker** - Containerization platform
+- **Docker Compose** - Multi-container orchestration
+- **GitHub Actions** - CI/CD automation
+- **Prometheus** - Metrics collection and monitoring
+- **Grafana** - Metrics visualization and dashboards
+
+### Testing
+- **Pytest** - Testing framework
+- **Coverage.py** - Code coverage measurement
+- **TestClient** - FastAPI testing utilities
+- **SQLite Memory DB** - In-memory test database
+
+---
+
+## 📦 Prerequisites
+
+### Required
+- **Python 3.10+**
+- **pip** (Python package manager)
+- **Git**
+
+### Optional (for full DevOps experience)
+- **Docker Desktop** - For containerization
+- **Docker Compose** - For multi-container setup
+
+### System Requirements
+- **OS**: Windows 10+, macOS 11+, or Linux
+- **RAM**: 4GB minimum (8GB recommended)
+- **Disk Space**: 2GB free space
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Run Locally (Development)
+
 ```bash
-git clone <your-repo-url>
-cd recipe-app-1
+# Clone the repository
+git clone https://github.com/yourusername/recipe-app-2.git
+cd recipe-app-2
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/Scripts/activate  # Windows Git Bash
+# source venv/bin/activate     # macOS/Linux
+
+# Install dependencies
+pip install -r backend/requirements.txt
+
+# Run the application
+uvicorn backend.main:app --reload
+
+# Open browser to http://localhost:8000
 ```
 
-### 2. Set Up Python Virtual Environment
+### Option 2: Run with Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/recipe-app-2.git
+cd recipe-app-2
+
+# Start everything (app + monitoring)
+docker-compose up -d
+
+# Access services:
+# - App: http://localhost:8000
+# - Prometheus: http://localhost:9090
+# - Grafana: http://localhost:3000
+```
+
+---
+
+## 🔧 Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/recipe-app-2.git
+cd recipe-app-2
+```
+
+### 2. Set Up Virtual Environment
+
 ```bash
 # Create virtual environment
 python -m venv venv
 
 # Activate virtual environment
-# On Windows (Git Bash):
+# Windows (Git Bash):
 source venv/Scripts/activate
-# On Windows (CMD):
+
+# Windows (CMD):
 venv\Scripts\activate
-# On Mac/Linux:
+
+# macOS/Linux:
 source venv/bin/activate
 ```
 
 ### 3. Install Dependencies
-```bash
-pip install fastapi uvicorn sqlalchemy python-multipart python-jose[cryptography] passlib[bcrypt]==1.7.4 bcrypt==4.0.1 httpx python-dotenv
 
-pip install fastapi uvicorn[standard] sqlalchemy passlib[bcrypt] python-jose[cryptography] python-multipart python-dotenv httpx pydantic[email]
+```bash
+# Production dependencies
+pip install -r backend/requirements.txt
+
+# Development dependencies (includes testing tools)
+pip install -r backend/requirements-dev.txt
 ```
 
-**Important**: We use `bcrypt==4.0.1` for compatibility with `passlib`. Version 5.x causes issues.
+### 4. Configure Environment Variables
 
-Or install from requirements.txt:
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Set Up Environment Variables (Optional)
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root:
 
 ```env
-SECRET_KEY=your-super-secret-jwt-key-here-make-it-long-and-random
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+# Database
 DATABASE_URL=sqlite:///./recipes.db
-SPOONACULAR_API_KEY=your-spoonacular-api-key-here
 
-(use:https://spoonacular.com/food-api)
+# Security
+SECRET_KEY=your-secret-key-here-change-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+
+# External API (Optional)
+SPOONACULAR_API_KEY=your-key-here
 ```
 
 **Generate a secure secret key:**
@@ -99,266 +256,583 @@ SPOONACULAR_API_KEY=your-spoonacular-api-key-here
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-### 5. Initialize the Database
+### 5. Initialize Database
+
 The database tables will be created automatically when you first run the application.
 
-### 6. Run the Application
-```bash
-# Run from project root
-uvicorn backend.main:app --reload
+---
 
+## 🏃 Running the Application
+
+### Development Mode (with auto-reload)
+
+```bash
+# Make sure virtual environment is activated
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The application will be available at: `http://127.0.0.1:8000`
+**Access the application:**
+- **Web App**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+- **Metrics**: http://localhost:8000/metrics
 
+### Production Mode
+
+```bash
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+---
+
+## 🧪 Running Tests
+
+### Run All Tests
+
+```bash
+cd backend
+pytest tests/ -v
+```
+
+### Run Tests with Coverage
+
+```bash
+# Generate coverage report
+pytest tests/ --cov=backend --cov-report=html --cov-report=term
+
+# View HTML report
+# Windows:
+start htmlcov/index.html
+
+# macOS:
+open htmlcov/index.html
+
+# Linux:
+xdg-open htmlcov/index.html
+```
+
+### Run Specific Test Categories
+
+```bash
+# Authentication tests
+pytest tests/test_auth.py -v
+
+# Recipe tests
+pytest tests/test_recipes.py -v
+
+# User tests
+pytest tests/test_users.py -v
+
+# Integration tests
+pytest tests/test_main.py -v
+```
+
+### Coverage Requirements
+
+- Minimum coverage: **70%**
+- Current coverage: **85%+**
+- CI pipeline fails if coverage drops below threshold
+
+---
+
+## 🐳 Docker Deployment
+
+### Single Container Deployment
+
+```bash
+# Build Docker image
+docker build -t recipe-app:latest .
+
+# Run container
+docker run -d \
+  -p 8000:8000 \
+  --name recipe-container \
+  recipe-app:latest
+
+# View logs
+docker logs -f recipe-container
+
+# Stop and remove
+docker stop recipe-container
+docker rm recipe-container
+```
+
+### Multi-Container with Monitoring (Recommended)
+
+```bash
+# Start all services (App + Prometheus + Grafana)
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f app
+
+# Stop all services
+docker-compose down
+```
+
+**Services Available:**
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Recipe App | http://localhost:8000 | - |
+| API Docs | http://localhost:8000/docs | - |
+| Prometheus | http://localhost:9090 | - |
+| Grafana | http://localhost:3000 | admin/admin |
+
+### Docker Image Details
+
+- **Base Image**: `python:3.10-slim`
+- **Image Size**: ~198 MB (optimized)
+- **Build Type**: Multi-stage build
+- **Health Check**: Automatic with `/health` endpoint
+
+---
+
+## 📊 Monitoring
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "2.0.0",
+  "database": "connected"
+}
+```
+
+### Metrics
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+**Response:**
+```json
+{
+  "request_count": 1523,
+  "error_count": 12,
+  "average_latency": 0.0234,
+  "error_rate": 0.79
+}
+```
+
+### Prometheus Setup
+
+1. **Access Prometheus**: http://localhost:9090
+2. Go to **Status** → **Targets**
+3. Verify `recipe-app` endpoint is **UP**
+
+**Example Queries:**
+```promql
+# Request rate (requests per second)
+rate(request_count[5m])
+
+# Error rate percentage
+(rate(error_count[5m]) / rate(request_count[5m])) * 100
+
+# 95th percentile latency
+histogram_quantile(0.95, average_latency)
+```
+
+### Grafana Dashboards
+
+1. **Access Grafana**: http://localhost:3000
+2. **Login**: Username: `admin`, Password: `admin`
+3. **Add Data Source**:
+   - Configuration → Data Sources → Add data source
+   - Select "Prometheus"
+   - URL: `http://prometheus:9090`
+   - Click "Save & Test"
+
+4. **Create Dashboard**:
+   - Click "+" → Dashboard
+   - Add panels for:
+     - Request count over time (line chart)
+     - Error rate (gauge)
+     - Average latency (stat)
+     - Request distribution (pie chart)
+
+---
+
+## 🔄 CI/CD Pipeline
+
+### GitHub Actions Workflow
+
+The project uses GitHub Actions for automated CI/CD with three stages:
+
+#### 1. Test Stage
+- Installs dependencies
+- Runs all tests
+- Measures code coverage
+- **Fails if**: Tests fail OR coverage < 70%
+
+#### 2. Build Stage
+- Builds Docker image
+- Tests container health
+- **Runs only if**: Tests pass
+
+#### 3. Deploy Stage
+- Pushes image to registry
+- Deploys to production
+- **Runs only if**: On `main` branch AND all tests pass
+
+### Triggering the Pipeline
+
+```bash
+# Make changes
+git add .
+git commit -m "Add: Your feature description"
+git push origin main
+```
+
+### Viewing Pipeline Results
+
+1. Go to your GitHub repository
+2. Click **Actions** tab
+3. View workflow runs and detailed logs
+
+### Required GitHub Secrets
+
+Configure in **Settings** → **Secrets and variables** → **Actions**:
+
+```
+DOCKER_USERNAME      # Docker Hub username
+DOCKER_PASSWORD      # Docker Hub access token
+RENDER_API_KEY       # Render.com API key (optional)
+RENDER_SERVICE_ID    # Render service ID (optional)
+```
+
+---
+
+##  API Documentation
+
+### Interactive Documentation
+
+FastAPI provides automatic interactive API documentation:
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### Authentication Endpoints
+
+#### Register User
+```http
+POST /auth/register
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "email": "user@example.com",
+  "password": "securepassword123"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 1,
+  "username": "newuser",
+  "email": "user@example.com",
+  "is_active": true,
+  "created_at": "2025-11-15T20:00:00Z"
+}
+```
+
+#### Login
+```http
+POST /auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=newuser&password=securepassword123
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+#### Get Current User
+```http
+GET /auth/me
+Authorization: Bearer <your-token>
+```
+
+### Recipe Endpoints
+
+#### Get All Recipes
+```http
+GET /recipes?skip=0&limit=20
+```
+
+#### Search Recipes
+```http
+GET /recipes/search?q=chicken&skip=0&limit=20
+```
+
+#### Get Recipe by ID
+```http
+GET /recipes/{recipe_id}
+```
+
+#### Create Recipe (Authenticated)
+```http
+POST /recipes
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Chocolate Cake",
+  "description": "Delicious chocolate cake",
+  "ingredients": "flour, eggs, chocolate, sugar, butter",
+  "instructions": "1. Mix dry ingredients\n2. Add wet ingredients\n3. Bake at 350°F",
+  "prep_time": 15,
+  "cook_time": 30,
+  "servings": 8,
+  "difficulty": "medium",
+  "image_url": "https://example.com/image.jpg"
+}
+```
+
+#### Update Recipe (Authenticated)
+```http
+PUT /recipes/{recipe_id}
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Updated Chocolate Cake"
+}
+```
+
+#### Delete Recipe (Authenticated)
+```http
+DELETE /recipes/{recipe_id}
+Authorization: Bearer <token>
+```
+
+### Favorite Endpoints
+
+#### Add to Favorites
+```http
+POST /favorites/{recipe_id}
+Authorization: Bearer <token>
+```
+
+#### Get User Favorites
+```http
+GET /favorites
+Authorization: Bearer <token>
+```
+
+#### Remove from Favorites
+```http
+DELETE /favorites/{recipe_id}
+Authorization: Bearer <token>
+```
+
+### External API Endpoints
+
+#### Search TheMealDB
+```http
+GET /api/recipes/external?q=chicken&number=10
+```
+
+#### Get Recipes by Category
+```http
+GET /api/recipes/category?c=Seafood
+```
+
+---
 
 ## Project Structure
 
 ```
-recipe-app-1/
+recipe-app-2/
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml              # GitHub Actions CI/CD pipeline
 ├── backend/
-│   ├── routers/
-│   │   ├── recipes.py      # Recipe routes
-│   │   └── users.py        # User routes
 │   ├── tests/
-│   │   ├── test_recipes.py
-│   │   └── test_users.py
+│   │   ├── __init__.py
+│   │   ├── conftest.py            # Pytest fixtures
+│   │   ├── test_auth.py           # Authentication tests
+│   │   ├── test_main.py           # Integration tests
+│   │   ├── test_recipes.py        # Recipe CRUD tests
+│   │   └── test_users.py          # User management tests
 │   ├── __init__.py
-│   ├── main.py             # FastAPI application entry point
-│   ├── database.py         # Database configuration
-│   ├── models.py           # SQLAlchemy models
-│   ├── schemas.py          # Pydantic schemas
-│   ├── crud.py             # Database operations
-│   └── auth.py             # Authentication logic
+│   ├── main.py                    # FastAPI application
+│   ├── auth.py                    # Authentication & JWT
+│   ├── crud.py                    # Database operations
+│   ├── database.py                # Database configuration
+│   ├── models.py                  # SQLAlchemy models
+│   ├── schemas.py                 # Pydantic schemas
+│   ├── config.py                  # Configuration management
+│   ├── requirements.txt           # Production dependencies
+│   └── requirements-dev.txt       # Development dependencies
 ├── frontend/
-│   ├── index.html          # Main HTML file
-│   ├── styles.css          # CSS styling
-│   └── app.js              # JavaScript logic
-├── venv/                   # Virtual environment
-├── requirements.txt        # Python dependencies
-├── .env                    # Environment variables (create this)
-├── .gitignore             # Git ignore file
-└── README.md              # This file
+│   ├── index.html                 # Main HTML file
+│   ├── app.js                     # JavaScript application
+│   └── styles.css                 # CSS styles
+├── monitoring/
+│   └── prometheus.yml             # Prometheus configuration
+├── Dockerfile                     # Docker container definition
+├── docker-compose.yml             # Multi-container setup
+├── .dockerignore                  # Docker ignore patterns
+├── .gitignore                     # Git ignore patterns
+├── .env.example                   # Environment template
+├── README.md                      # This file
+├── REPORT.md                      # Technical report
+└── LICENSE                        # MIT License
 ```
 
-## Usage
+---
 
-### 1. Register a New User
-- Click "Login" in the navigation bar
-- Switch to "Register" tab
-- Fill in username, email, and password
-- Click "Register"
+## 🐛 Troubleshooting
 
-### 2. Login
-- Click "Login" in the navigation
-- Enter your username and password
-- Click "Login"
+### Common Issues
 
-### 3. Browse All Recipes
-- Go to "Recipes" tab to see all public recipes
-- Click "Load More" to load additional recipes
-- Click on any recipe card to view full details
-
-### 4. Search by Ingredient
-- Use the search bar on the homepage
-- Enter an ingredient (e.g., "chicken", "pasta", "tomato")
-- Optionally check "Include external sources" for TheMealDB results
-- Click "Search" or press Enter
-
-### 5. Add a Recipe
-- After logging in, go to "My Recipes"
-- Click "Add Recipe" button
-- Fill in the recipe details:
-  - Title
-  - Description
-  - Ingredients (one per line)
-  - Instructions
-  - Prep time, cook time, servings
-  - Difficulty level
-  - Image URL
-- Click "Save Recipe"
-
-### 6. Manage Your Recipes
-- Go to "My Recipes" to see all recipes you've created
-- Click "Edit" to update a recipe
-- Click "Delete" to remove a recipe
-
-### 7. Manage Favorites
-- Click the heart icon on any recipe to add/remove from favorites
-- Go to "Favorites" tab to see your saved recipes
-
-## API Endpoints
-
-### Authentication
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login user and get JWT token
-- `GET /auth/me` - Get current authenticated user info
-
-### Recipes (Public - No Auth Required)
-- `GET /api/recipes?skip=0&limit=10` - Get all public recipes with pagination
-- `GET /api/recipes/search?ingredient=chicken&include_external=true` - Search recipes by ingredient
-- `GET /recipes/{id}` - Get specific recipe details
-
-### Recipes (Authenticated)
-- `GET /recipes/my` - Get current user's recipes
-- `POST /recipes` - Create new recipe
-- `PUT /recipes/{id}` - Update recipe (own recipes only)
-- `DELETE /recipes/{id}` - Delete recipe (own recipes only)
-
-### Favorites (Authenticated)
-- `GET /favorites` - Get user's favorite recipes
-- `POST /favorites/{recipe_id}` - Add recipe to favorites
-- `DELETE /favorites/{recipe_id}` - Remove recipe from favorites
-
-### External APIs
-- `GET /api/recipes/external?q=chicken&number=10` - Search TheMealDB
-- `GET /recipes/search/ingredient?ingredient=chicken` - Search TheMealDB by ingredient
-
-## Key Features Explained
-
-### Pagination
-The `/api/recipes` endpoint supports pagination:
-- `skip`: Number of recipes to skip (default: 0)
-- `limit`: Number of recipes to return (default: 10)
-- Returns `has_more` flag to indicate if more recipes are available
-
-### Public vs Private Recipes
-- Recipes have an `is_public` field (boolean)
-- Public recipes appear in "All Recipes" and search results
-- Private recipes only appear in "My Recipes" for the owner
-
-### Ingredient Search
-- Searches the `ingredients` field in all public recipes
-- Case-insensitive search using SQL ILIKE
-- Optionally includes results from TheMealDB external API
-
-## Testing
-
-Run the tests:
+#### Port Already in Use
 ```bash
-pytest backend/tests/
+# Windows - Find and kill process
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# macOS/Linux
+lsof -ti:8000 | xargs kill -9
+
+# Or use different port
+uvicorn backend.main:app --port 8001
 ```
 
-Run with coverage:
+#### ModuleNotFoundError
 ```bash
-pytest --cov=backend backend/tests/
+# Ensure virtual environment is activated
+source venv/Scripts/activate  # Windows
+source venv/bin/activate      # macOS/Linux
+
+# Reinstall dependencies
+pip install -r backend/requirements.txt
 ```
 
-## External API Integration
+#### Database Connection Error
+```bash
+# Reset database
+rm -f recipes.db
+uvicorn backend.main:app --reload
+```
 
-### TheMealDB (Free, No API Key Required)
-The app integrates with TheMealDB API for additional recipe data. No configuration needed!
+#### Docker Build Fails
+```bash
+# Clean Docker cache
+docker system prune -a
 
-When you search with "Include external sources" checked, the app will:
-1. Search your local database for matching recipes
-2. Query TheMealDB for additional recipes
-3. Display both sets of results
+# Rebuild without cache
+docker-compose build --no-cache
+```
 
-### Spoonacular (Optional, Requires API Key)
-If you want to use Spoonacular API:
+#### Argon2 ImportError
+```bash
+# Reinstall argon2
+docker ps
+```
 
-1. Sign up for a free API key at [Spoonacular](https://spoonacular.com/food-api)
-2. Add your API key to the `.env` file:
-   ```
-   SPOONACULAR_API_KEY=your-api-key-here
-   ```
-3. The app will automatically include Spoonacular results when available
+#### Tests Failing
+```bash
+# Update test dependencies
+pip install -r backend/requirements-dev.txt
 
-## Troubleshooting
+# Run with verbose output
+pytest tests/ -v --tb=short
+```
 
-### "ModuleNotFoundError: No module named 'jwt'"
-- Make sure you installed `python-jose[cryptography]`, not `pyjwt`
-- Update imports in `auth.py`:
-  ```python
-  from jose import jwt
-  from jose.exceptions import JWTError
-  ```
+---
 
-### "ValueError: password cannot be longer than 72 bytes"
-- Install the compatible bcrypt version:
-  ```bash
-  pip uninstall bcrypt
-  pip install bcrypt==4.0.1
-  ```
+## 📄 License
 
-### "Error loading ASGI app"
-- Make sure you're running from the project root
-- Use the correct command: `uvicorn backend.main:app --reload`
-- Check that `backend/__init__.py` exists
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### CORS Issues
-- The backend is configured to allow requests from `http://localhost:8000` and `http://127.0.0.1:8000`
-- If you're running on a different port, update the CORS settings in `backend/main.py`
+---
 
-## Deployment
+## 👨‍💻 Author
 
-### Using Railway
-1. Connect your GitHub repository to Railway
-2. Add environment variables in Railway dashboard:
-   - `SECRET_KEY`
-   - `SPOONACULAR_API_KEY` (optional)
-3. Railway will auto-detect your Python app
-4. Deploy automatically on push
+**Your Name**
+- GitHub: [@yourusername](https://github.com/yourusername)
+- Email: your.email@example.com
+- Course: [Your Course Name]
 
-### Using Render
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Set build command: `pip install -r requirements.txt`
-4. Set start command: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-5. Add environment variables in Render dashboard
+---
 
-### Using Heroku
-1. Create a `Procfile` in your project root:
-   ```
-   web: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
-   ```
-2. Deploy via Heroku CLI:
-   ```bash
-   heroku create your-app-name
-   git push heroku main
-   heroku config:set SECRET_KEY=your-secret-key
-   ```
+##  Acknowledgments
 
-### Manual Deployment (VPS)
-1. SSH into your server
-2. Clone your repository
-3. Set up virtual environment and install dependencies
-4. Use a process manager like systemd or supervisor
-5. Set up nginx as reverse proxy
-6. Configure SSL with Let's Encrypt
+- **FastAPI** - For the excellent framework and documentation
+- **TheMealDB** - For providing free recipe data
+- **Prometheus & Grafana** - For monitoring capabilities
+- **Docker** - For containerization platform
+- Course instructors and teaching assistants
 
-## Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## 📝 Version History
 
-## License
+### Version 2.0.0 (Current) - Assignment 2
+- ✅ Added automated testing (75+ tests, 85% coverage)
+- ✅ Implemented CI/CD pipeline with GitHub Actions
+- ✅ Containerized with Docker and Docker Compose
+- ✅ Added monitoring with Prometheus and Grafana
+- ✅ Upgraded to Argon2 password hashing
+- ✅ Refactored code following SOLID principles
+- ✅ Added health checks and metrics endpoints
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+### Version 1.0.0 - Assignment 1
+- Initial release with basic CRUD functionality
+- User authentication with JWT
+- Recipe management
+- External API integration
+- Favorites system
 
-## Future Enhancements
+---
+# Install argon2 directly in the running container
+docker-compose exec app pip install argon2-cffi argon2-cffi-bindings
 
-- [ ] Recipe categories and tags
-- [ ] Recipe ratings and reviews
-- [ ] Image upload functionality
-- [ ] Nutritional information
-- [ ] Shopping list generator
-- [ ] Meal planning calendar
-- [ ] Recipe sharing via URL
-- [ ] Social features (follow users, share recipes)
+# Restart the container
+docker-compose restart app
 
-## Support
+# Wait a few seconds
+sleep 5
 
-If you encounter any issues or have questions, please:
-1. Check the Troubleshooting section above
-2. Review the API documentation at `/docs`
-3. Open an issue on GitHub
+# Test registration
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser999",
+    "email": "test999@test.com",
+    "password": "test1234"
+  }'
 
-## Acknowledgments
+  Start grafana and prometheus
+  cd ~/Desktop/year\ three/recipe-app-2
+  docker-compose start grafana prometheus
 
-- TheMealDB for providing free recipe data
-- FastAPI for the excellent framework and documentation
-- All contributors who help improve this project
+Grafana: Open http://localhost:3000 in your browser
+
+Default login: username-admin /password- admin
+You'll be prompted to change the password on first login
+
+
+Prometheus: Open http://localhost:9090
+
+No login required

@@ -8,9 +8,9 @@ on:
 
 env:
   PYTHON_VERSION: '3.10'  # Match your Dockerfile
-  APP_NAME: 'meher-recipe-app'  # CHANGE THIS to your name
-  RESOURCE_GROUP: 'meher-recipe-rg'  # CHANGE THIS to your name
-  ACR_NAME: 'meherrecipeacr'  # CHANGE THIS to your name (no hyphens)
+  APP_NAME: 'geethika-recipe-app'  # CHANGE THIS to your name
+  RESOURCE_GROUP: 'geethika-recipe-rg'  # CHANGE THIS to your name
+  ACR_NAME: 'geethikarecipeacr'  # CHANGE THIS to your name (no hyphens)
   LOCATION: 'westeurope'
 
 jobs:

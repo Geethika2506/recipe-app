@@ -16,21 +16,21 @@ variables:
   - group: azure-credentials
   
   # IMPORTANT: Replace YOUR_NAME with your actual name (e.g., meher-recipe-app)
-  appName: 'Geethika-recipe-app'
-  resourceGroup: 'Geethika-recipe-rg'
+  appName: 'geethika-recipe-app'
+  resourceGroup: 'geethika-recipe-rg'
   location: 'westeurope'
   
   # Python version
   pythonVersion: '3.10'
   
   # Docker settings
-  containerRegistry: 'Geethikarecipeacr.azurecr.io'
+  containerRegistry: 'geethikarecipeacr.azurecr.io'
   imageRepository: 'recipe-finder'
   dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
   tag: '$(Build.BuildId)'
   
   # Azure Container Registry name (no .azurecr.io suffix)
-  acrName: 'Geethikarecipeacr'
+  acrName: 'geethikarecipeacr'
 
 stages:
   # ============================================================

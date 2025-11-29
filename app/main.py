@@ -486,3 +486,4 @@ async def read_root():
         "metrics": "/metrics",
         "version": "2.0.0"
     }
+    

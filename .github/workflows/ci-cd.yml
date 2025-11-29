@@ -104,4 +104,3 @@ jobs:
         echo "🎉 CI/CD Pipeline Completed!"
         echo "✅ Application tested"
         echo "✅ Build checked"
-        echo "📦 Ready for deployment"

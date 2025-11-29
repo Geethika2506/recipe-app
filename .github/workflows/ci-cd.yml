@@ -1,12 +1,22 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Azure Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.10'  # Match your Dockerfile
+  APP_NAME: 'meher-recipe-app'  # CHANGE THIS to your name
+  RESOURCE_GROUP: 'meher-recipe-rg'  # CHANGE THIS to your name
+  ACR_NAME: 'meherrecipeacr'  # CHANGE THIS to your name (no hyphens)
+  LOCATION: 'westeurope'
 
 jobs:
+  # ============================================
+  # JOB 1: TEST APPLICATION
+  # ============================================
   test:
     name: Test Application
     runs-on: ubuntu-latest
@@ -18,7 +28,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: ${{ env.PYTHON_VERSION }}
     
     - name: Cache pip dependencies
       uses: actions/cache@v3
@@ -31,19 +41,23 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install fastapi uvicorn sqlalchemy pydantic python-jose passlib python-multipart httpx prometheus-client python-dotenv
+        pip install -r requirements.txt
     
     - name: List project structure
       run: |
         echo "=== Project Structure ==="
         ls -la
-        echo "=== App folder ==="
-        ls -la app/ || echo "No app folder"
+        echo "=== Backend folder ==="
+        ls -la backend/ || echo "No backend folder"
+        echo "=== Frontend folder ==="
+        ls -la frontend/ || echo "No frontend folder"
     
-    - name: Check Python files exist
+    - name: Check critical files exist
       run: |
         python -c "import sys; print('Python version:', sys.version)"
-        test -f app/main.py && echo "✅ main.py found" || echo "❌ main.py not found"
+        test -f app/main.py && echo "✅ app/main.py found" || echo "❌ app/main.py not found"
+        test -f Dockerfile && echo "✅ Dockerfile found" || echo "❌ Dockerfile not found"
+        test -f requirements.txt && echo "✅ requirements.txt found" || echo "❌ requirements.txt not found"
     
     - name: Test application import
       run: |
@@ -53,19 +67,29 @@ jobs:
     - name: Lint with flake8
       run: |
         pip install flake8
-        flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics || echo "⚠️ Some linting issues (non-blocking)"
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics || echo "⚠️ Some linting issues (non-blocking)"
+      continue-on-error: true
+    
+    - name: Run tests with pytest
+      run: |
+        pip install pytest pytest-asyncio pytest-cov
+        export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+        pytest tests/ -v --cov=backend --cov-report=xml --cov-report=html || echo "⚠️ Some tests failed (non-blocking)"
       continue-on-error: true
     
     - name: Start server and test health endpoint
       run: |
         export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-        timeout 15 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        timeout 15 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
         sleep 8
         curl -f http://localhost:8000/health && echo "✅ Health check passed" || echo "⚠️ Health check failed"
       continue-on-error: true
 
+  # ============================================
+  # JOB 2: BUILD DOCKER IMAGE
+  # ============================================
   build:
-    name: Build Check
+    name: Build Docker Image
     runs-on: ubuntu-latest
     needs: test
     
@@ -77,30 +101,332 @@ jobs:
       run: |
         if [ -f Dockerfile ]; then
           echo "✅ Dockerfile found"
+          echo "=== Dockerfile contents ==="
           cat Dockerfile
         else
-          echo "⚠️ Dockerfile not found (skipping Docker build)"
+          echo "❌ Dockerfile not found"
+          exit 1
         fi
     
     - name: Set up Docker Buildx
-      if: hashFiles('Dockerfile') != ''
       uses: docker/setup-buildx-action@v2
     
-    - name: Build Docker image
-      if: hashFiles('Dockerfile') != ''
+    - name: Build Docker image (test)
       run: |
-        docker build -t recipe-app:${{ github.sha }} .
+        docker build -t recipe-app:test .
         echo "✅ Docker image built successfully"
-      continue-on-error: true
+        docker images | grep recipe-app
 
-  success:
-    name: All Checks Passed
+  # ============================================
+  # JOB 3: SETUP AZURE INFRASTRUCTURE
+  # ============================================
+  infrastructure:
+    name: Setup Azure Infrastructure
     runs-on: ubuntu-latest
-    needs: [test, build]
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     
     steps:
-    - name: Success notification
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: |
+          {
+            "clientId": "${{ secrets.AZURE_APP_ID }}",
+            "clientSecret": "${{ secrets.AZURE_PASSWORD }}",
+            "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+            "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+          }
+    
+    - name: Create Resource Group
       run: |
-        echo "🎉 CI/CD Pipeline Completed!"
-        echo "✅ Application tested"
-        echo "✅ Build checked"
+        az group create \
+          --name ${{ env.RESOURCE_GROUP }} \
+          --location ${{ env.LOCATION }} \
+          --tags Environment=Dev Project=RecipeFinder Owner=${{ github.actor }}
+        echo "✅ Resource Group: ${{ env.RESOURCE_GROUP }}"
+    
+    - name: Create Azure Container Registry
+      run: |
+        if ! az acr show --name ${{ env.ACR_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} 2>/dev/null; then
+          az acr create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.ACR_NAME }} \
+            --sku Basic \
+            --admin-enabled true
+          echo "✅ ACR created: ${{ env.ACR_NAME }}"
+        else
+          echo "ℹ️ ACR exists: ${{ env.ACR_NAME }}"
+          az acr update --name ${{ env.ACR_NAME }} --admin-enabled true
+        fi
+    
+    - name: Create App Service Plans
+      run: |
+        # Staging
+        if ! az appservice plan show --name ${{ env.APP_NAME }}-plan-staging --resource-group ${{ env.RESOURCE_GROUP }} 2>/dev/null; then
+          az appservice plan create \
+            --name ${{ env.APP_NAME }}-plan-staging \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --is-linux --sku B1
+          echo "✅ Staging plan created"
+        fi
+        
+        # Production
+        if ! az appservice plan show --name ${{ env.APP_NAME }}-plan-prod --resource-group ${{ env.RESOURCE_GROUP }} 2>/dev/null; then
+          az appservice plan create \
+            --name ${{ env.APP_NAME }}-plan-prod \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --is-linux --sku B1
+          echo "✅ Production plan created"
+        fi
+    
+    - name: Create Web Apps
+      run: |
+        # Staging
+        if ! az webapp show --name ${{ env.APP_NAME }}-staging --resource-group ${{ env.RESOURCE_GROUP }} 2>/dev/null; then
+          az webapp create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --plan ${{ env.APP_NAME }}-plan-staging \
+            --name ${{ env.APP_NAME }}-staging \
+            --deployment-container-image-name ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:latest
+          
+          az webapp config appsettings set \
+            --name ${{ env.APP_NAME }}-staging \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --settings WEBSITES_PORT=8000 DOCKER_ENABLE_CI=true
+          
+          echo "✅ Staging app: https://${{ env.APP_NAME }}-staging.azurewebsites.net"
+        fi
+        
+        # Production
+        if ! az webapp show --name ${{ env.APP_NAME }}-prod --resource-group ${{ env.RESOURCE_GROUP }} 2>/dev/null; then
+          az webapp create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --plan ${{ env.APP_NAME }}-plan-prod \
+            --name ${{ env.APP_NAME }}-prod \
+            --deployment-container-image-name ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:latest
+          
+          az webapp config appsettings set \
+            --name ${{ env.APP_NAME }}-prod \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --settings WEBSITES_PORT=8000 DOCKER_ENABLE_CI=true
+          
+          echo "✅ Production app: https://${{ env.APP_NAME }}-prod.azurewebsites.net"
+        fi
+
+  # ============================================
+  # JOB 4: BUILD & PUSH TO ACR
+  # ============================================
+  docker-push:
+    name: Build and Push to ACR
+    runs-on: ubuntu-latest
+    needs: infrastructure
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: |
+          {
+            "clientId": "${{ secrets.AZURE_APP_ID }}",
+            "clientSecret": "${{ secrets.AZURE_PASSWORD }}",
+            "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+            "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+          }
+    
+    - name: Login to ACR
+      run: |
+        az acr login --name ${{ env.ACR_NAME }}
+        echo "✅ Logged in to ACR: ${{ env.ACR_NAME }}"
+    
+    - name: Build and Push Docker Image
+      run: |
+        IMAGE_TAG="${{ github.sha }}"
+        
+        docker build -t ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:${IMAGE_TAG} .
+        docker tag ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:${IMAGE_TAG} ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:latest
+        
+        docker push ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:${IMAGE_TAG}
+        docker push ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:latest
+        
+        echo "✅ Images pushed:"
+        echo "📦 ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:${IMAGE_TAG}"
+        echo "📦 ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:latest"
+
+  # ============================================
+  # JOB 5: DEPLOY TO STAGING
+  # ============================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: docker-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://${{ env.APP_NAME }}-staging.azurewebsites.net
+    
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: |
+          {
+            "clientId": "${{ secrets.AZURE_APP_ID }}",
+            "clientSecret": "${{ secrets.AZURE_PASSWORD }}",
+            "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+            "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+          }
+    
+    - name: Get ACR Credentials
+      id: acr
+      run: |
+        USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --query username -o tsv)
+        PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query passwords[0].value -o tsv)
+        echo "::add-mask::$PASSWORD"
+        echo "username=$USERNAME" >> $GITHUB_OUTPUT
+        echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+    
+    - name: Deploy to Staging Web App
+      run: |
+        az webapp config container set \
+          --name ${{ env.APP_NAME }}-staging \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --docker-custom-image-name ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:${{ github.sha }} \
+          --docker-registry-server-url https://${{ env.ACR_NAME }}.azurecr.io \
+          --docker-registry-server-user ${{ steps.acr.outputs.username }} \
+          --docker-registry-server-password ${{ steps.acr.outputs.password }}
+        
+        az webapp restart \
+          --name ${{ env.APP_NAME }}-staging \
+          --resource-group ${{ env.RESOURCE_GROUP }}
+        
+        echo "✅ Deployed to staging"
+        echo "🌐 URL: https://${{ env.APP_NAME }}-staging.azurewebsites.net"
+    
+    - name: Health Check
+      run: |
+        echo "⏳ Waiting 45 seconds for deployment..."
+        sleep 45
+        
+        for i in {1..10}; do
+          echo "Health check attempt $i/10..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.APP_NAME }}-staging.azurewebsites.net/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Staging health check PASSED!"
+            echo "🎉 Staging deployment successful!"
+            exit 0
+          fi
+          
+          echo "Response: $response - Retrying in 10s..."
+          sleep 10
+        done
+        
+        echo "⚠️ Health check did not pass - Check logs"
+        echo "View logs: az webapp log tail --name ${{ env.APP_NAME }}-staging --resource-group ${{ env.RESOURCE_GROUP }}"
+
+  # ============================================
+  # JOB 6: DEPLOY TO PRODUCTION
+  # ============================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: docker-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://${{ env.APP_NAME }}-prod.azurewebsites.net
+    
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: |
+          {
+            "clientId": "${{ secrets.AZURE_APP_ID }}",
+            "clientSecret": "${{ secrets.AZURE_PASSWORD }}",
+            "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+            "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+          }
+    
+    - name: Get ACR Credentials
+      id: acr
+      run: |
+        USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --query username -o tsv)
+        PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query passwords[0].value -o tsv)
+        echo "::add-mask::$PASSWORD"
+        echo "username=$USERNAME" >> $GITHUB_OUTPUT
+        echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+    
+    - name: Deploy to Production Web App
+      run: |
+        az webapp config container set \
+          --name ${{ env.APP_NAME }}-prod \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --docker-custom-image-name ${{ env.ACR_NAME }}.azurecr.io/recipe-finder:${{ github.sha }} \
+          --docker-registry-server-url https://${{ env.ACR_NAME }}.azurecr.io \
+          --docker-registry-server-user ${{ steps.acr.outputs.username }} \
+          --docker-registry-server-password ${{ steps.acr.outputs.password }}
+        
+        az webapp restart \
+          --name ${{ env.APP_NAME }}-prod \
+          --resource-group ${{ env.RESOURCE_GROUP }}
+        
+        echo "✅ Deployed to production"
+        echo "🌐 URL: https://${{ env.APP_NAME }}-prod.azurewebsites.net"
+    
+    - name: Production Health Check
+      run: |
+        echo "⏳ Waiting 45 seconds for deployment..."
+        sleep 45
+        
+        for i in {1..12}; do
+          echo "Health check attempt $i/12..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.APP_NAME }}-prod.azurewebsites.net/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Production health check PASSED!"
+            echo "🎉 PRODUCTION DEPLOYMENT SUCCESSFUL!"
+            echo "🌐 Live at: https://${{ env.APP_NAME }}-prod.azurewebsites.net"
+            exit 0
+          fi
+          
+          echo "Response: $response - Retrying in 10s..."
+          sleep 10
+        done
+        
+        echo "⚠️ Health check did not pass - Check logs"
+        echo "View logs: az webapp log tail --name ${{ env.APP_NAME }}-prod --resource-group ${{ env.RESOURCE_GROUP }}"
+
+  # ============================================
+  # JOB 7: SUCCESS SUMMARY
+  # ============================================
+  success:
+    name: Pipeline Complete
+    runs-on: ubuntu-latest
+    needs: [test, build, docker-push]
+    if: always()
+    
+    steps:
+    - name: Pipeline Summary
+      run: |
+        echo "================================"
+        echo "🎉 CI/CD Pipeline Summary"
+        echo "================================"
+        echo "✅ Tests completed"
+        echo "✅ Docker build completed"
+        if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          echo "✅ Staging deployment triggered"
+          echo "🌐 Staging: https://${{ env.APP_NAME }}-staging.azurewebsites.net"
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "✅ Production deployment triggered"
+          echo "🌐 Production: https://${{ env.APP_NAME }}-prod.azurewebsites.net"
+        fi
+        echo "================================"

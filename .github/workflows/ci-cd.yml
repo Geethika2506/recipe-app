@@ -74,13 +74,13 @@ jobs:
       run: |
         pip install pytest pytest-asyncio pytest-cov
         export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-        pytest tests/ -v --cov=backend --cov-report=xml --cov-report=html || echo "⚠️ Some tests failed (non-blocking)"
+        pytest tests/ -v --cov=app --cov-report=xml --cov-report=html || echo "⚠️ Some tests failed (non-blocking)"
       continue-on-error: true
     
     - name: Start server and test health endpoint
       run: |
         export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-        timeout 15 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+        timeout 15 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
         sleep 8
         curl -f http://localhost:8000/health && echo "✅ Health check passed" || echo "⚠️ Health check failed"
       continue-on-error: true

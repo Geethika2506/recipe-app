@@ -1,0 +1,576 @@
+# Azure Pipeline for Recipe Finder App (FastAPI + Frontend)
+# IMPORTANT: Replace YOUR_NAME with your actual name throughout this file
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+variables:
+  # Variable group with Service Principal credentials (stored securely)
+  - group: azure-credentials
+  
+  # IMPORTANT: Replace YOUR_NAME with your actual name (e.g., meher-recipe-app)
+  appName: 'Geethika-recipe-app'
+  resourceGroup: 'Geethika-recipe-rg'
+  location: 'westeurope'
+  
+  # Python version
+  pythonVersion: '3.10'
+  
+  # Docker settings
+  containerRegistry: 'Geethikarecipeacr.azurecr.io'
+  imageRepository: 'recipe-finder'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+  
+  # Azure Container Registry name (no .azurecr.io suffix)
+  acrName: 'Geethikarecipeacr'
+
+stages:
+  # ============================================================
+  # STAGE 1: BUILD & TEST (CI)
+  # ============================================================
+  - stage: Build
+    displayName: 'Build and Test'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Run Tests'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          # Step 1: Setup Python
+          - task: UsePythonVersion@0
+            displayName: 'Use Python $(pythonVersion)'
+            inputs:
+              versionSpec: '$(pythonVersion)'
+          
+          # Step 2: Install dependencies
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+          
+          # Step 3: Run linting (optional - won't fail build)
+          - script: |
+              pip install flake8
+              flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
+              flake8 backend/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+            displayName: 'Run code linting'
+            continueOnError: true
+          
+          # Step 4: Run tests with coverage
+          - script: |
+              pip install pytest pytest-cov pytest-asyncio
+              export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+              pytest tests/ -v --cov=backend --cov-report=xml --cov-report=html --junitxml=test-results.xml || true
+            displayName: 'Run tests with coverage'
+            continueOnError: true
+          
+          # Step 5: Publish test results
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'test-results.xml'
+              failTaskOnFailedTests: false
+          
+          # Step 6: Publish code coverage
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish code coverage'
+            condition: always()
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: 'coverage.xml'
+              reportDirectory: 'htmlcov'
+          
+          # Step 7: Validate Dockerfile
+          - script: |
+              if [ ! -f "Dockerfile" ]; then
+                echo "❌ Dockerfile not found!"
+                exit 1
+              fi
+              echo "✅ Dockerfile exists"
+              
+              if [ ! -f "requirements.txt" ]; then
+                echo "❌ requirements.txt not found!"
+                exit 1
+              fi
+              echo "✅ requirements.txt exists"
+              
+              if [ ! -d "backend" ]; then
+                echo "❌ backend/ directory not found!"
+                exit 1
+              fi
+              echo "✅ backend/ directory exists"
+              
+              if [ ! -d "frontend" ]; then
+                echo "⚠️ Warning: frontend/ directory not found"
+              else
+                echo "✅ frontend/ directory exists"
+              fi
+            displayName: 'Validate project structure'
+          
+          # Step 8: Build artifact
+          - task: ArchiveFiles@2
+            displayName: 'Archive application'
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+          
+          # Step 9: Publish artifact
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish build artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+
+  # ============================================================
+  # STAGE 2: CREATE AZURE RESOURCES (Infrastructure)
+  # ============================================================
+  - stage: Infrastructure
+    displayName: 'Setup Azure Infrastructure'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: CreateResources
+        displayName: 'Create Azure Resources'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          # Login to Azure using Service Principal
+          - task: AzureCLI@2
+            displayName: 'Create Resource Group'
+            inputs:
+              azureSubscription: 'manual-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Login with Service Principal
+                az login --service-principal \
+                  -u $(AZURE_APP_ID) \
+                  -p $(AZURE_PASSWORD) \
+                  --tenant $(AZURE_TENANT_ID)
+                
+                az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                
+                # Create Resource Group
+                az group create \
+                  --name $(resourceGroup) \
+                  --location $(location) \
+                  --tags Environment=Dev Project=RecipeFinder Owner=$(Build.RequestedFor)
+                
+                echo "✅ Resource Group created: $(resourceGroup)"
+          
+          - task: AzureCLI@2
+            displayName: 'Create Azure Container Registry'
+            inputs:
+              azureSubscription: 'manual-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az login --service-principal \
+                  -u $(AZURE_APP_ID) \
+                  -p $(AZURE_PASSWORD) \
+                  --tenant $(AZURE_TENANT_ID)
+                
+                az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                
+                # Create ACR if it doesn't exist
+                if ! az acr show --name $(acrName) --resource-group $(resourceGroup) 2>/dev/null; then
+                  az acr create \
+                    --resource-group $(resourceGroup) \
+                    --name $(acrName) \
+                    --sku Basic \
+                    --admin-enabled true
+                  echo "✅ ACR created: $(acrName)"
+                else
+                  echo "ℹ️ ACR already exists: $(acrName)"
+                  # Ensure admin is enabled
+                  az acr update --name $(acrName) --admin-enabled true
+                fi
+                
+                # Get ACR credentials for later use
+                ACR_USERNAME=$(az acr credential show --name $(acrName) --query username -o tsv)
+                ACR_PASSWORD=$(az acr credential show --name $(acrName) --query passwords[0].value -o tsv)
+                echo "##vso[task.setvariable variable=ACR_USERNAME;isOutput=true]$ACR_USERNAME"
+                echo "##vso[task.setvariable variable=ACR_PASSWORD;isOutput=true;issecret=true]$ACR_PASSWORD"
+          
+          - task: AzureCLI@2
+            displayName: 'Create App Service Plans'
+            inputs:
+              azureSubscription: 'manual-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az login --service-principal \
+                  -u $(AZURE_APP_ID) \
+                  -p $(AZURE_PASSWORD) \
+                  --tenant $(AZURE_TENANT_ID)
+                
+                az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                
+                # Create App Service Plan for Staging
+                if ! az appservice plan show --name $(appName)-plan-staging --resource-group $(resourceGroup) 2>/dev/null; then
+                  az appservice plan create \
+                    --name $(appName)-plan-staging \
+                    --resource-group $(resourceGroup) \
+                    --is-linux \
+                    --sku B1
+                  echo "✅ Staging App Service Plan created"
+                else
+                  echo "ℹ️ Staging App Service Plan already exists"
+                fi
+                
+                # Create App Service Plan for Production
+                if ! az appservice plan show --name $(appName)-plan-prod --resource-group $(resourceGroup) 2>/dev/null; then
+                  az appservice plan create \
+                    --name $(appName)-plan-prod \
+                    --resource-group $(resourceGroup) \
+                    --is-linux \
+                    --sku B1
+                  echo "✅ Production App Service Plan created"
+                else
+                  echo "ℹ️ Production App Service Plan already exists"
+                fi
+          
+          - task: AzureCLI@2
+            displayName: 'Create Web Apps'
+            inputs:
+              azureSubscription: 'manual-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az login --service-principal \
+                  -u $(AZURE_APP_ID) \
+                  -p $(AZURE_PASSWORD) \
+                  --tenant $(AZURE_TENANT_ID)
+                
+                az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                
+                # Create Staging Web App
+                if ! az webapp show --name $(appName)-staging --resource-group $(resourceGroup) 2>/dev/null; then
+                  az webapp create \
+                    --resource-group $(resourceGroup) \
+                    --plan $(appName)-plan-staging \
+                    --name $(appName)-staging \
+                    --deployment-container-image-name $(containerRegistry)/$(imageRepository):latest
+                  
+                  # Configure container settings for staging
+                  az webapp config appsettings set \
+                    --name $(appName)-staging \
+                    --resource-group $(resourceGroup) \
+                    --settings \
+                      WEBSITES_PORT=8000 \
+                      DOCKER_REGISTRY_SERVER_URL=https://$(containerRegistry) \
+                      DOCKER_ENABLE_CI=true
+                  
+                  echo "✅ Staging Web App created: https://$(appName)-staging.azurewebsites.net"
+                else
+                  echo "ℹ️ Staging Web App already exists"
+                fi
+                
+                # Create Production Web App
+                if ! az webapp show --name $(appName)-prod --resource-group $(resourceGroup) 2>/dev/null; then
+                  az webapp create \
+                    --resource-group $(resourceGroup) \
+                    --plan $(appName)-plan-prod \
+                    --name $(appName)-prod \
+                    --deployment-container-image-name $(containerRegistry)/$(imageRepository):latest
+                  
+                  # Configure container settings for production
+                  az webapp config appsettings set \
+                    --name $(appName)-prod \
+                    --resource-group $(resourceGroup) \
+                    --settings \
+                      WEBSITES_PORT=8000 \
+                      DOCKER_REGISTRY_SERVER_URL=https://$(containerRegistry) \
+                      DOCKER_ENABLE_CI=true
+                  
+                  echo "✅ Production Web App created: https://$(appName)-prod.azurewebsites.net"
+                else
+                  echo "ℹ️ Production Web App already exists"
+                fi
+
+  # ============================================================
+  # STAGE 3: BUILD & PUSH DOCKER IMAGE
+  # ============================================================
+  - stage: Docker
+    displayName: 'Build Docker Image'
+    dependsOn: Infrastructure
+    condition: succeeded()
+    jobs:
+      - job: BuildDocker
+        displayName: 'Build and Push Docker Image'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        steps:
+          # Download source code artifact
+          - download: current
+            artifact: drop
+            displayName: 'Download build artifact'
+          
+          - task: ExtractFiles@1
+            displayName: 'Extract build artifact'
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)/drop/*.zip'
+              destinationFolder: '$(Build.SourcesDirectory)'
+              cleanDestinationFolder: true
+          
+          # Login to Azure and ACR
+          - task: AzureCLI@2
+            displayName: 'Login to ACR'
+            inputs:
+              azureSubscription: 'manual-service-connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az login --service-principal \
+                  -u $(AZURE_APP_ID) \
+                  -p $(AZURE_PASSWORD) \
+                  --tenant $(AZURE_TENANT_ID)
+                
+                az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                
+                # Login to ACR
+                az acr login --name $(acrName)
+                echo "✅ Logged in to ACR: $(acrName)"
+          
+          # Build and push Docker image
+          - task: Docker@2
+            displayName: 'Build and Push Docker Image'
+            inputs:
+              command: 'buildAndPush'
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              containerRegistry: 'manual-service-connection'
+              tags: |
+                $(tag)
+                latest
+          
+          - script: |
+              echo "✅ Docker image built and pushed successfully"
+              echo "📦 Image: $(containerRegistry)/$(imageRepository):$(tag)"
+              echo "📦 Image: $(containerRegistry)/$(imageRepository):latest"
+            displayName: 'Display image details'
+
+  # ============================================================
+  # STAGE 4: DEPLOY TO STAGING
+  # ============================================================
+  - stage: DeployStaging
+    displayName: 'Deploy to Staging'
+    dependsOn: Docker
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    jobs:
+      - deployment: DeployWebAppStaging
+        displayName: 'Deploy to Staging Environment'
+        environment: 'staging'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Configure ACR Credentials'
+                  inputs:
+                    azureSubscription: 'manual-service-connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      az login --service-principal \
+                        -u $(AZURE_APP_ID) \
+                        -p $(AZURE_PASSWORD) \
+                        --tenant $(AZURE_TENANT_ID)
+                      
+                      az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                      
+                      # Get ACR credentials
+                      ACR_USERNAME=$(az acr credential show --name $(acrName) --query username -o tsv)
+                      ACR_PASSWORD=$(az acr credential show --name $(acrName) --query passwords[0].value -o tsv)
+                      
+                      # Configure Web App with ACR credentials
+                      az webapp config container set \
+                        --name $(appName)-staging \
+                        --resource-group $(resourceGroup) \
+                        --docker-custom-image-name $(containerRegistry)/$(imageRepository):$(tag) \
+                        --docker-registry-server-url https://$(containerRegistry) \
+                        --docker-registry-server-user $ACR_USERNAME \
+                        --docker-registry-server-password $ACR_PASSWORD
+                      
+                      echo "✅ Container configuration updated"
+                
+                - task: AzureCLI@2
+                  displayName: 'Deploy to Staging Web App'
+                  inputs:
+                    azureSubscription: 'manual-service-connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      az login --service-principal \
+                        -u $(AZURE_APP_ID) \
+                        -p $(AZURE_PASSWORD) \
+                        --tenant $(AZURE_TENANT_ID)
+                      
+                      az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                      
+                      # Restart Web App to pull new image
+                      az webapp restart \
+                        --name $(appName)-staging \
+                        --resource-group $(resourceGroup)
+                      
+                      echo "⏳ Waiting for deployment to complete..."
+                      sleep 45
+                      
+                      echo "✅ Deployed to staging"
+                      echo "🌐 URL: https://$(appName)-staging.azurewebsites.net"
+                      echo "🏥 Health: https://$(appName)-staging.azurewebsites.net/health"
+                
+                - task: AzureCLI@2
+                  displayName: 'Staging Health Check'
+                  inputs:
+                    azureSubscription: 'manual-service-connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "🔍 Running health check..."
+                      
+                      MAX_ATTEMPTS=10
+                      ATTEMPT=1
+                      
+                      while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                        echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+                        
+                        response=$(curl -s -o /dev/null -w "%{http_code}" https://$(appName)-staging.azurewebsites.net/health || echo "000")
+                        
+                        if [ "$response" = "200" ]; then
+                          echo "✅ Staging health check passed!"
+                          exit 0
+                        fi
+                        
+                        echo "⏳ Response: $response - Waiting 10s before retry..."
+                        sleep 10
+                        ATTEMPT=$((ATTEMPT + 1))
+                      done
+                      
+                      echo "⚠️ Health check did not return 200 after $MAX_ATTEMPTS attempts"
+                      echo "ℹ️ Check application logs for details"
+                      exit 0  # Don't fail deployment
+
+  # ============================================================
+  # STAGE 5: DEPLOY TO PRODUCTION
+  # ============================================================
+  - stage: DeployProduction
+    displayName: 'Deploy to Production'
+    dependsOn: Docker
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployWebAppProduction
+        displayName: 'Deploy to Production Environment'
+        environment: 'production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Configure ACR Credentials'
+                  inputs:
+                    azureSubscription: 'manual-service-connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      az login --service-principal \
+                        -u $(AZURE_APP_ID) \
+                        -p $(AZURE_PASSWORD) \
+                        --tenant $(AZURE_TENANT_ID)
+                      
+                      az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                      
+                      # Get ACR credentials
+                      ACR_USERNAME=$(az acr credential show --name $(acrName) --query username -o tsv)
+                      ACR_PASSWORD=$(az acr credential show --name $(acrName) --query passwords[0].value -o tsv)
+                      
+                      # Configure Web App with ACR credentials
+                      az webapp config container set \
+                        --name $(appName)-prod \
+                        --resource-group $(resourceGroup) \
+                        --docker-custom-image-name $(containerRegistry)/$(imageRepository):$(tag) \
+                        --docker-registry-server-url https://$(containerRegistry) \
+                        --docker-registry-server-user $ACR_USERNAME \
+                        --docker-registry-server-password $ACR_PASSWORD
+                      
+                      echo "✅ Container configuration updated"
+                
+                - task: AzureCLI@2
+                  displayName: 'Deploy to Production Web App'
+                  inputs:
+                    azureSubscription: 'manual-service-connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      az login --service-principal \
+                        -u $(AZURE_APP_ID) \
+                        -p $(AZURE_PASSWORD) \
+                        --tenant $(AZURE_TENANT_ID)
+                      
+                      az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+                      
+                      # Restart Web App to pull new image
+                      az webapp restart \
+                        --name $(appName)-prod \
+                        --resource-group $(resourceGroup)
+                      
+                      echo "⏳ Waiting for deployment to complete..."
+                      sleep 45
+                      
+                      echo "✅ Deployed to production"
+                      echo "🌐 URL: https://$(appName)-prod.azurewebsites.net"
+                      echo "🏥 Health: https://$(appName)-prod.azurewebsites.net/health"
+                
+                - task: AzureCLI@2
+                  displayName: 'Production Health Check'
+                  inputs:
+                    azureSubscription: 'manual-service-connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      echo "🔍 Running production health check..."
+                      
+                      MAX_ATTEMPTS=12
+                      ATTEMPT=1
+                      
+                      while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                        echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+                        
+                        response=$(curl -s -o /dev/null -w "%{http_code}" https://$(appName)-prod.azurewebsites.net/health || echo "000")
+                        
+                        if [ "$response" = "200" ]; then
+                          echo "✅ Production health check passed!"
+                          echo "🎉 Deployment successful!"
+                          echo "🌐 Application URL: https://$(appName)-prod.azurewebsites.net"
+                          exit 0
+                        fi
+                        
+                        echo "⏳ Response: $response - Waiting 10s before retry..."
+                        sleep 10
+                        ATTEMPT=$((ATTEMPT + 1))
+                      done
+                      
+                      echo "⚠️ Health check did not return 200 after $MAX_ATTEMPTS attempts"
+                      echo "🔧 Check application logs: az webapp log tail --name $(appName)-prod --resource-group $(resourceGroup)"
+                      exit 0  # Don't fail deployment

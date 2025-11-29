@@ -1,78 +1,128 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+# tests/conftest.py - REPLACE your current conftest.py with this
+
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app, get_db
-from app.database import Base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from app.main import app
+from app.database import Base, get_db
+from app import models, schemas, crud
 
-import uuid
+# Test database setup
+SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
 
-# Use in-memory SQLite for full isolation
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test_test.db" 
-engine = create_engine(SQLALCHEMY_TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Override FastAPI dependency
-def override_get_db():
+
+# Fixtures
+@pytest.fixture(scope="function")
+def create_test_db():
+    """Create test database tables"""
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def db_session(create_test_db):
+    """Create a fresh database session for each test"""
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
 
+
+@pytest.fixture(scope="function")
+def clear_db(create_test_db):
+    """Clear database between tests"""
+    db = TestingSessionLocal()
+    try:
+        # Clear all tables
+        db.query(models.Favorite).delete()
+        db.query(models.Recipe).delete()
+        db.query(models.User).delete()
+        db.commit()
+        yield db
+    finally:
+        db.close()
+
+
+def override_get_db():
+    """Override database dependency for testing"""
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Override the dependency
 app.dependency_overrides[get_db] = override_get_db
 
 
-# Fixture: create fresh database before tests
-@pytest.fixture(scope="session", autouse=True)
-def create_test_db():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+@pytest.fixture(scope="function")
+def test_client(create_test_db):
+    """Create a test client for the FastAPI app"""
+    client = TestClient(app)
+    yield client
+
 
 @pytest.fixture(scope="function")
-def client():
-    # Create tables before each test
-    Base.metadata.create_all(bind=engine)
-    yield TestClient(app)
-    # Drop tables after each test
-    Base.metadata.drop_all(bind=engine)
+def client(create_test_db):
+    """Alias for test_client - some tests use 'client' instead"""
+    client = TestClient(app)
+    yield client
 
 
-@pytest.fixture
-def test_user(client):
-    unique_id = uuid.uuid4().hex[:6]
-    user_data = {
-        "username": f"testuser_{unique_id}",
-        "email": f"test_{unique_id}@example.com",
-        "password": "password123"
-    }
-    response = client.post("/auth/register", json=user_data)
-    assert response.status_code == 200, f"User registration failed: {response.json()}"
-
-    # login to get token
-    login_resp = client.post("/auth/login", data={"username": user_data["username"], "password": user_data["password"]})
-    assert login_resp.status_code == 200
-    token = login_resp.json()["access_token"]
-
-    return {"user": user_data, "token": token, "headers": {"Authorization": f"Bearer {token}"}}
-
-@pytest.fixture(autouse=True)
-def clear_db():
-    yield
-    from app.models import User, Recipe, Favorite  # adjust imports
-    db = TestingSessionLocal()
-    db.query(Favorite).delete()
-    db.query(Recipe).delete()
-    db.query(User).delete()
-    db.commit()
-    db.close()
-
-def test_create_recipe(client, test_user):
-    headers = test_user["headers"]
-    response = client.post(
-        "/recipes",
-        json={"title": "My Recipe", "ingredients": "Eggs", "instructions": "Cook it"},
-        headers=headers
+@pytest.fixture(scope="function")
+def test_user(db_session: Session):
+    """Create a test user"""
+    user_data = schemas.UserCreate(
+        username="testuser",
+        email="test@example.com",
+        password="testpassword123"
     )
-    assert response.status_code == 200
+    user = crud.create_user(db=db_session, user=user_data)
+    # Store the plain password for login tests
+    user.plain_password = "testpassword123"
+    return user
+
+
+@pytest.fixture(scope="function")
+def test_recipe(db_session: Session, test_user):
+    """Create a test recipe"""
+    recipe_data = schemas.RecipeCreate(
+        title="Test Recipe",
+        description="A test recipe description",
+        ingredients="1 cup flour\n2 eggs\n1 cup milk",
+        instructions="Mix all ingredients and bake at 350°F for 30 minutes",
+        prep_time=10,
+        cook_time=30,
+        servings=4,
+        difficulty="easy",
+        image_url="https://example.com/image.jpg"
+    )
+    recipe = crud.create_recipe(db=db_session, recipe=recipe_data, user_id=test_user.id)
+    return recipe
+
+
+@pytest.fixture(scope="function")
+def auth_token(test_client, test_user):
+    """Get authentication token for test user"""
+    response = test_client.post(
+        "/auth/login",
+        data={
+            "username": test_user.username,
+            "password": test_user.plain_password
+        }
+    )
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    else:
+        raise Exception(f"Failed to get auth token: {response.json()}")

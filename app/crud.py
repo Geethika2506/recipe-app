@@ -118,7 +118,7 @@ def create_external_recipe(db: Session, recipe: schemas.RecipeCreate) -> models.
 # ----------------- Favorite CRUD -----------------
 def add_favorite(db: Session, user_id: int, recipe_id: int) -> models.Favorite:
     """Add recipe to favorites"""
-    # Check if already favorited
+    
     existing = db.query(models.Favorite).filter(
         and_(models.Favorite.user_id == user_id, models.Favorite.recipe_id == recipe_id)
     ).first()

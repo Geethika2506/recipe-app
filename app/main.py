@@ -367,24 +367,31 @@ async def add_to_favorites_by_id(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    try:
-        recipe = crud.get_recipe(db, recipe_id)
-        if not recipe:
-            raise HTTPException(status_code=404, detail="Recipe not found")
-        
-        existing_favorite = db.query(models.Favorite).filter(
-            models.Favorite.user_id == current_user.id,
-            models.Favorite.recipe_id == recipe_id
-        ).first()
-        
-        if existing_favorite:
-            return {"message": "Recipe already in favorites"}
-        
-        favorite = crud.add_favorite(db, current_user.id, recipe_id)
-        return {"message": "Recipe added to favorites"}
-    except Exception as e:
-        print(f"Error adding favorite by ID: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """Add existing recipe to favorites by ID"""
+    # Check if recipe exists - this will raise 404 if not found
+    recipe = crud.get_recipe(db, recipe_id)
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    
+    # Check if already in favorites
+    existing_favorite = db.query(models.Favorite).filter(
+        models.Favorite.user_id == current_user.id,
+        models.Favorite.recipe_id == recipe_id
+    ).first()
+    
+    if existing_favorite:
+        return {
+            "message": "Recipe already in favorites",
+            "favorite_id": existing_favorite.id  # ADD THIS
+        }
+    
+    # Add to favorites
+    favorite = crud.add_favorite(db, current_user.id, recipe_id)
+    return {
+        "message": "Recipe added to favorites",
+        "favorite_id": favorite.id  # ADD THIS
+    }
+
 
 @app.delete("/favorites/{recipe_id}")
 async def remove_from_favorites(
@@ -392,14 +399,21 @@ async def remove_from_favorites(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    try:
-        success = crud.remove_favorite(db, current_user.id, recipe_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Favorite not found")
-        return {"message": "Recipe removed from favorites"}
-    except Exception as e:
-        print(f"Error removing favorite: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """Remove recipe from favorites"""
+    # Check if favorite exists first
+    favorite = db.query(models.Favorite).filter(
+        models.Favorite.user_id == current_user.id,
+        models.Favorite.recipe_id == recipe_id
+    ).first()
+    
+    if not favorite:
+        raise HTTPException(status_code=404, detail="Favorite not found")
+    
+    # Delete the favorite
+    db.delete(favorite)
+    db.commit()
+    
+    return {"message": "Recipe removed from favorites"}
 # ----------------- External API Integration -----------------
 @app.get("/api/recipes/external", tags=["External"])
 async def search_external_recipes(q: str, number: int = 10):

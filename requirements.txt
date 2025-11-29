@@ -23,9 +23,5 @@ pytest-asyncio==0.21.1
 # Code quality
 black==23.12.0
 flake8==6.1.0
-<<<<<<< HEAD
-pylint==3.0.3;
+pylint==3.0.3
 python-dotenv==1.0.0
-=======
-pylint==3.0.3python-dotenv
->>>>>>> origin/main

@@ -307,7 +307,6 @@ async function loadFavorites() {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
 
-<<<<<<< HEAD
         console.log('Response status:', response.status);
         console.log('Response ok:', response.ok);
 
@@ -317,49 +316,44 @@ async function loadFavorites() {
             console.log('Favorites type:', typeof favorites);
             console.log('Is array:', Array.isArray(favorites));
             console.log('Length:', favorites ? favorites.length : 0);
-            
+
             if (favorites && favorites.length > 0) {
                 console.log('First favorite structure:', JSON.stringify(favorites[0], null, 2));
             }
-            
-            displayFavorites(favorites, 'favorites-grid');
-=======
-        if (response.ok) {
-            const favoriteRecipes = await response.json();
-            displayFavoriteRecipes(favoriteRecipes, 'favorites-grid');
->>>>>>> 0bdd4c4f2f34af6f3e8485687e625ca66f4df037
+
+            // Ensure we pass an array of recipes to the renderer
+            const favArray = Array.isArray(favorites) ? favorites : (favorites.recipes || []);
+            displayFavoriteRecipes(favArray, 'favorites-grid');
         } else {
             const errorText = await response.text();
             console.error('Error response:', errorText);
-            showToast('Error loading favorites', 'error');
+            // Try to parse JSON error if possible
+            let errMsg = 'Error loading favorites';
+            try {
+                const parsed = JSON.parse(errorText);
+                errMsg = parsed.detail || parsed.message || errMsg;
+            } catch (e) {
+                // ignore parse error
+            }
+            showToast(errMsg, 'error');
         }
     } catch (error) {
-<<<<<<< HEAD
-        console.error('Error loading favorites:', error);
-        showToast('Network error loading favorites', 'error');
-=======
         console.error('=== CATCH BLOCK ===');
         console.error('Error type:', error.name);
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
         showToast('Network error loading favorites: ' + error.message, 'error');
->>>>>>> origin/main
     } finally {
         console.log('=== loadFavorites END ===');
         showLoading(false);
     }
 }
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
 function displayFavoriteRecipes(recipes, containerId) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
 
-    const validRecipes = recipes.filter(recipe => recipe != null && typeof recipe === 'object' && recipe.id);
+    const validRecipes = (recipes || []).filter(recipe => recipe != null && typeof recipe === 'object' && (recipe.id || recipe._id));
 
     if (validRecipes.length === 0) {
         container.innerHTML = '<div class="no-recipes"><p>No favorites yet. Add recipes to favorites to see them here!</p></div>';
@@ -370,23 +364,19 @@ function displayFavoriteRecipes(recipes, containerId) {
         const card = createRecipeCard(recipe, false);
         // Modify button to be a remove button
         const actionBtn = card.querySelector('.btn-favorite');
-        if(actionBtn) {
+        if (actionBtn) {
             actionBtn.className = 'btn btn-danger';
             actionBtn.innerHTML = '<i class="fas fa-heart-broken"></i> Remove';
             actionBtn.onclick = (e) => {
                 e.stopPropagation();
-                removeFavorite(recipe.id);
+                removeFavorite(recipe.id || recipe._id);
             };
         }
         container.appendChild(card);
     });
 }
-<<<<<<< HEAD
 
-=======
-// Original function for home/recipes/search tabs
->>>>>>> 0bdd4c4f2f34af6f3e8485687e625ca66f4df037
->>>>>>> origin/main
+
 function displayRecipes(recipes, containerId, showActions = false) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';

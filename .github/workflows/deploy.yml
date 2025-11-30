@@ -21,7 +21,7 @@ jobs:
         creds: |
           {
             "clientId": "${{ secrets.AZURE_APP_ID }}",
-            "clientSecret": "${{ secrets.AZURE_PASSWORD }}",
+            "clientSecret": "${{ secrets['AZURE PASSWORD'] }}",
             "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
             "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
           }
@@ -32,27 +32,32 @@ jobs:
       run: |
         az group list --output table
     
-    - name: Create Resource Group (example)
+    - name: Use Existing Resource Group
       run: |
         YOUR_NAME="geethika"
-        RESOURCE_GROUP="rg-${YOUR_NAME}-dev"
-        LOCATION="eastus"
+        # Use the existing shared resource group
+        RESOURCE_GROUP="BCSAI2025-DEVOPS-STUDENTS-A"
         
-        az group create \
-          --name $RESOURCE_GROUP \
-          --location $LOCATION \
-          --tags owner=$YOUR_NAME environment=dev
+        echo "Using resource group: $RESOURCE_GROUP"
+        echo "Resources will be tagged with owner=$YOUR_NAME"
     
-    - name: Deploy Azure Resources (example with ARM template)
+    - name: Deploy Azure Resources (example)
       run: |
         YOUR_NAME="geethika"
-        RESOURCE_GROUP="rg-${YOUR_NAME}-dev"
+        RESOURCE_GROUP="BCSAI2025-DEVOPS-STUDENTS-A"
         
-        # Example: Deploy using ARM template or Bicep
-        # az deployment group create \
+        # Example: Create a storage account in the existing resource group
+        # Storage account names must be globally unique and lowercase
+        STORAGE_NAME="stgeethika$(date +%s)"
+        
+        echo "Would create storage account: $STORAGE_NAME"
+        # Uncomment when ready to create:
+        # az storage account create \
+        #   --name $STORAGE_NAME \
         #   --resource-group $RESOURCE_GROUP \
-        #   --template-file ./infrastructure/main.bicep \
-        #   --parameters ./infrastructure/parameters.json
+        #   --location westeurope \
+        #   --sku Standard_LRS \
+        #   --tags owner=$YOUR_NAME environment=dev
     
     - name: Azure Logout
       run: |

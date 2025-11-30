@@ -1,0 +1,60 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: |
+          {
+            "clientId": "${{ secrets.AZURE_APP_ID }}",
+            "clientSecret": "${{ secrets.AZURE_PASSWORD }}",
+            "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+            "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+          }
+    
+    # Note: Using your secret names exactly as created in GitHub
+    
+    - name: Azure CLI - List Resource Groups
+      run: |
+        az group list --output table
+    
+    - name: Create Resource Group (example)
+      run: |
+        YOUR_NAME="geethika"
+        RESOURCE_GROUP="rg-${YOUR_NAME}-dev"
+        LOCATION="eastus"
+        
+        az group create \
+          --name $RESOURCE_GROUP \
+          --location $LOCATION \
+          --tags owner=$YOUR_NAME environment=dev
+    
+    - name: Deploy Azure Resources (example with ARM template)
+      run: |
+        YOUR_NAME="geethika"
+        RESOURCE_GROUP="rg-${YOUR_NAME}-dev"
+        
+        # Example: Deploy using ARM template or Bicep
+        # az deployment group create \
+        #   --resource-group $RESOURCE_GROUP \
+        #   --template-file ./infrastructure/main.bicep \
+        #   --parameters ./infrastructure/parameters.json
+    
+    - name: Azure Logout
+      run: |
+        az logout
+      if: always()

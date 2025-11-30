@@ -47,7 +47,7 @@ jobs:
         # Add any build steps needed (e.g., npm build for frontend)
     
     - name: Upload artifact for deployment
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: recipe-app
         path: .
@@ -60,7 +60,7 @@ jobs:
     
     steps:
     - name: Download artifact from build job
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: recipe-app
     

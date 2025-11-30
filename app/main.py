@@ -9,6 +9,9 @@ from datetime import timedelta
 import os
 import httpx
 import time
+from datetime import datetime
+from fastapi import Request
+from fastapi.responses import PlainTextResponse
 
 # Prometheus metrics imports
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST

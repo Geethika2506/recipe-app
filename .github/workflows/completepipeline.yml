@@ -9,7 +9,7 @@ on:
 
 env:
   RESOURCE_GROUP: BCSAI2025-DEVOPS-STUDENTS-A
-  LOCATION: westeurope
+  LOCATION: northeurope
   OWNER: geethika
   APP_NAME: app-geethika-recipe
   APP_PLAN: plan-geethika-dev
@@ -74,32 +74,61 @@ jobs:
             "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
             "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
           }
-    
-    - name: Create App Service Plan (if not exists)
+
+    - name: List existing App Service Plans
       run: |
-        # Check if plan exists
-        if ! az appservice plan show --name ${{ env.APP_PLAN }} --resource-group ${{ env.RESOURCE_GROUP }} &> /dev/null; then
-          echo "Creating App Service Plan..."
-          az appservice plan create \
+        echo "Checking existing App Service Plans..."
+        az appservice plan list \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --output table
+    
+    - name: Create or Use App Service Plan
+      run: |
+        # Try to use an existing plan first
+        EXISTING_PLAN=$(az appservice plan list \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query "[?tags.owner=='${{ env.OWNER }}'].name | [0]" \
+          --output tsv)
+        
+        if [ -z "$EXISTING_PLAN" ]; then
+          echo "No existing plan found for ${{ env.OWNER }}"
+          echo "Trying to create new plan with Basic SKU..."
+          
+          # Try Basic SKU instead of Free
+          if az appservice plan create \
             --name ${{ env.APP_PLAN }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --location ${{ env.LOCATION }} \
-            --sku F1 \
+            --sku B1 \
             --is-linux \
-            --tags owner=${{ env.OWNER }} environment=dev
+            --tags owner=${{ env.OWNER }} environment=dev; then
+            echo "Created new Basic plan"
+          else
+            echo "ERROR: Could not create plan. Using shared plan as fallback."
+            # Use any available plan in the resource group
+            SHARED_PLAN=$(az appservice plan list \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --query "[0].name" \
+              --output tsv)
+            echo "APP_PLAN_NAME=$SHARED_PLAN" >> $GITHUB_ENV
+          fi
         else
-          echo "App Service Plan already exists"
+          echo "Using existing plan: $EXISTING_PLAN"
+          echo "APP_PLAN_NAME=$EXISTING_PLAN" >> $GITHUB_ENV
         fi
     
     - name: Create Web App (if not exists)
       run: |
+        # Use the plan name from previous step or default
+        PLAN_TO_USE="${APP_PLAN_NAME:-${{ env.APP_PLAN }}}"
+        
         # Check if web app exists
         if ! az webapp show --name ${{ env.APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} &> /dev/null; then
-          echo "Creating Web App..."
+          echo "Creating Web App using plan: $PLAN_TO_USE"
           az webapp create \
             --name ${{ env.APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --plan ${{ env.APP_PLAN }} \
+            --plan "$PLAN_TO_USE" \
             --runtime "PYTHON:3.11" \
             --tags owner=${{ env.OWNER }} environment=dev
         else

@@ -44,7 +44,7 @@ ACTIVE_REQUESTS = Gauge(
 )
 
 # Create database tables
-models.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=engine, checkfirst=True)
 
 # Initialize FastAPI app
 app = FastAPI(
